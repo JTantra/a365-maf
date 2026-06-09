@@ -37,7 +37,7 @@ Set up the Python virtual environment manually before running the agent or deplo
 	- macOS/Linux: `source .venv/bin/activate`
 
 ## Agent365 Configuration
-FOr more in-depth configuration of Agent365, refer to this [readme](./docs/AGENT365-SETUP.md)
+For more in-depth configuration of Agent365, refer to this [readme](./docs/AGENT365-SETUP.md)
 
 ## Working with User Identity
 

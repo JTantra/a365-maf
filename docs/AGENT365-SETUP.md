@@ -161,22 +161,128 @@ block in headless environments.
 > Use `az login --allow-no-subscriptions` even if you do have a subscription —
 > the standard flow does not require one.
 
-#### 2b. Entra ID role check
+#### 2b. Roles check
 
-Confirm with your tenant admin that your account has at least:
+Two different role systems apply — don't confuse them:
 
-- **Agent ID Developer** — required for all paths.
-- **Azure Contributor** — required additionally for the **AI Teammate** path (infrastructure provisioning).
-- **Agent ID Administrator / Application Administrator / Global Administrator** — required to grant S2S admin consent (the CLI will print a PowerShell fallback script if you don't have one of these).
+| Role system | Examples | Where to manage |
+|---|---|---|
+| **Entra ID (directory) roles** | *Agent ID Developer*, *Application Administrator*, *Global Administrator* | Entra admin center → **Roles & admins** |
+| **Azure RBAC roles** | *Contributor*, *Owner*, *Reader* | Azure portal → the subscription → **Access control (IAM)** |
 
-#### 2c. Custom client app
+Confirm your account has at least:
 
-The CLI auto-resolves an Entra app by the well-known display name
-**"Agent 365 CLI"**. You do **not** need to provide a client ID.
+- **Agent ID Developer** *(Entra)* — required for all paths.
+- **Contributor** *(Azure RBAC, on the target subscription)* — required additionally for the **AI Teammate** path. Assign it in the Azure portal: **Subscriptions → \<your sub\> → Access control (IAM) → Add role assignment → Contributor**.
+- **Agent ID Administrator / Application Administrator / Global Administrator** *(Entra)* — required to grant S2S admin consent (the CLI prints a PowerShell fallback script if you don't have one of these).
 
-If the CLI later reports it cannot find that app, ask your tenant admin to
-register it and grant admin consent for the required Microsoft Graph
-permissions.
+Quick CLI check for your Azure RBAC role on the subscription:
+
+```bash
+az role assignment list \
+  --assignee "$(az account show --query user.name -o tsv)" \
+  --subscription <your-subscription-id> \
+  --include-inherited \
+  -o table
+```
+
+#### 2c. Register the "Agent 365 CLI" Entra app and M365 Tools (one-time, per tenant)
+
+The CLI auto-resolves a tenant Entra app by the **exact display name**
+`Agent 365 CLI`. You do **not** need to provide a client ID, but the app must
+exist with the right permissions and admin consent before any `a365` command
+will run. If you see:
+
+```text
+App "Agent 365 CLI" was not found in tenant <tenant-id>.
+```
+
+an Application Administrator or Global Administrator must register it. There
+is **no official script** that does this end-to-end — pick one of the two
+options below.
+
+##### Option A — Manual registration in the Entra portal
+
+1. Open [entra.microsoft.com](https://entra.microsoft.com) as an Application Administrator or Global Administrator, switched to your target tenant.
+2. **Identity → Applications → App registrations → + New registration**.
+   - **Name**: `Agent 365 CLI` (exact — the CLI matches on display name).
+   - **Supported account types**: *Accounts in this organizational directory only (Single tenant)*.
+   - **Redirect URI**: platform **Public client/native (mobile & desktop)** → `http://localhost`.
+   - Click **Register**.
+3. **Authentication** blade: set **Allow public client flows** = **Yes**, then **Save**.
+4. **API permissions → + Add a permission → Microsoft Graph → Delegated permissions** — add at minimum:
+   - `User.Read`
+   - `Application.ReadWrite.All`
+   - `AppRoleAssignment.ReadWrite.All`
+   - `Directory.ReadWrite.All`
+   - `DelegatedPermissionGrant.ReadWrite.All`
+   - `Group.ReadWrite.All`
+5. Click **Grant admin consent for \<tenant\>** at the top of the permissions list and confirm.
+
+> If the CLI later complains about a missing scope, add it the same way and re-consent. The exact set evolves with CLI versions.
+
+##### Option B — Azure CLI one-liner
+
+```bash
+APP_ID=$(az ad app create \
+  --display-name "Agent 365 CLI" \
+  --sign-in-audience AzureADMyOrg \
+  --public-client-redirect-uris http://localhost \
+  --is-fallback-public-client true \
+  --query appId -o tsv)
+
+az ad sp create --id "$APP_ID"
+
+GRAPH=00000003-0000-0000-c000-000000000000
+for SCOPE_ID in \
+  e1fe6dd8-ba31-4d61-89e7-88639da4683d \
+  bdfbf15f-ee85-4955-8675-146e8e5296b5 \
+  84bccea3-f856-4a8a-967b-dbe0a3d53a64 \
+  19dbc75e-c2e2-444c-a770-ec69d8559fc7 \
+  41ce6ca6-6826-4807-84f1-1c82854f7ee5 \
+  4e46008b-f24c-477d-8fff-7bb4ec7aafe0 \
+; do
+  az ad app permission add --id "$APP_ID" --api $GRAPH --api-permissions "${SCOPE_ID}=Scope"
+done
+
+az ad app permission admin-consent --id "$APP_ID"
+echo "App Id: $APP_ID"
+```
+
+Scope IDs above (in order): `User.Read`, `Application.ReadWrite.All`,
+`AppRoleAssignment.ReadWrite.All`, `Directory.ReadWrite.All`,
+`DelegatedPermissionGrant.ReadWrite.All`, `Group.ReadWrite.All`.
+
+##### Verify
+
+```bash
+az ad app list --display-name "Agent 365 CLI" -o table
+```
+
+You should see exactly one app with that display name. Re-run
+`a365 setup all ...` once it's there.
+
+##### Provision Microsoft 365 tool service principals (admin-only)
+
+The `Agent 365 CLI` app above lets the CLI itself run. To let your agent
+*invoke* Microsoft 365 MCP tools (Mail, Calendar, Teams, OneDrive, SharePoint,
+…), an admin also needs to create service principals for those tool apps in
+your tenant. The Agent 365 devtools repo ships a script for exactly that:
+
+```powershell
+# Requires PowerShell 7+, run as admin
+git clone https://github.com/microsoft/Agent365-devTools.git
+cd Agent365-devTools/scripts/cli/Auth
+.\New-Agent365ToolsServicePrincipalProdPublic.ps1            # provisions V1 + V2 SPs
+# Or, to provision only one mode:
+# .\New-Agent365ToolsServicePrincipalProdPublic.ps1 -Mode V2
+```
+
+The script is idempotent (existing SPs are skipped) and requires
+`Application.ReadWrite.All` or an Application Administrator / Global
+Administrator role. Run it once per tenant; you'll know you need it if `a365`
+tool-related commands later fail with `Insufficient privileges` against an MCP
+server app ID.
 
 #### 2d. Python build tools (this project)
 
@@ -334,6 +440,7 @@ These are manual and must be done by you in a browser.
 | Interactive auth prompt blocks in CI / headless VM | Run `az login --allow-no-subscriptions` in an interactive session first so the CLI can reuse the cached token silently. |
 | `Authenticating via Windows Account Manager...` then silence | A native Windows sign-in dialog opened — check your screen / taskbar and complete it. Do not kill the process. |
 | `Forbidden` / `Authorization_RequestDenied` during blueprint creation | Missing directory role or admin consent — revisit Step 2b. |
+| `App "Agent 365 CLI" was not found in tenant <id>` | The tenant client app isn't registered — follow Step 2c. |
 | `Operation cannot be completed without additional quota` | Azure region/SKU quota hit — pick a different region and retry. |
 | Publish fails reaching admin center | Custom client app missing `Application.ReadWrite.All`; have an admin grant it. |
 | Need detailed logs | Re-run with `-v` / `--verbose`. Logs live at `%APPDATA%/a365/logs/` (Windows) or `~/.config/a365/logs/` (Linux/macOS). |

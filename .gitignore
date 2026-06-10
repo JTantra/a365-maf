@@ -24,5 +24,8 @@ venv/
 .deployment
 .DS_Store
 
+# azd (Azure Developer CLI) — local env state, never commit
+.azure/
+
 # Dev tool directories
 /devTools/

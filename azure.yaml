@@ -1,0 +1,42 @@
+# azd template metadata for the Agent 365 sample agent.
+# Run `azd up` from the repo root to provision infra + build & deploy the image.
+
+name: agent365-agent-framework-template
+metadata:
+  template: agent365-agent-framework-template@1.0.0
+
+# The Bicep template lives in ./infra/main.bicep.
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+# Services azd builds and deploys after provisioning. The 'agent' name is
+# referenced in main.bicep via tags['azd-service-name']='agent' so azd knows
+# which Container App is the deploy target for this service.
+services:
+  agent:
+    project: .
+    host: containerapp
+    language: python
+    docker:
+      path: ./Dockerfile
+      context: .
+
+hooks:
+  # After `azd up` / `azd deploy` finishes, remind the operator to register
+  # the new endpoint with the Agent 365 blueprint.
+  postdeploy:
+    shell: sh
+    interactive: true
+    continueOnError: true
+    run: |
+      echo
+      echo "----------------------------------------------------------------"
+      echo " Container App is live."
+      echo " Now register the endpoint with your Agent 365 blueprint:"
+      echo
+      echo "   FQDN=\$(azd env get-values | grep AGENT_FQDN | cut -d= -f2 | tr -d '\"')"
+      echo "   a365 setup blueprint --agent-name <your-agent-base-name> \\"
+      echo "     --endpoint-only --messaging-endpoint \"https://\$FQDN/api/messages\""
+      echo "----------------------------------------------------------------"

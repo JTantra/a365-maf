@@ -392,14 +392,19 @@ class GenericAgentHost:
 
         print("=" * 80)
         print(f"🏢 {self.agent_class.__name__}")
+        # Bind address: default to localhost for safe local dev. In a container
+        # (Dockerfile / Container Apps / Kubernetes) set HOST=0.0.0.0 so the
+        # server is reachable on the container network.
+        host = environ.get("HOST", "localhost")
+
         print("=" * 80)
         print(f"🔒 Auth: {'Enabled' if auth_configuration else 'Anonymous'}")
-        print(f"🚀 Server: localhost:{port}")
-        print(f"📚 Endpoint: http://localhost:{port}/api/messages")
-        print(f"❤️  Health: http://localhost:{port}/api/health\n")
+        print(f"🚀 Server: {host}:{port}")
+        print(f"📚 Endpoint: http://{host}:{port}/api/messages")
+        print(f"❤️  Health: http://{host}:{port}/api/health\n")
 
         try:
-            run_app(app, host="localhost", port=port, handle_signals=True)
+            run_app(app, host=host, port=port, handle_signals=True)
         except KeyboardInterrupt:
             print("\n👋 Server stopped")
 

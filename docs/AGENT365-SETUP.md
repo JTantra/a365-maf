@@ -4,13 +4,34 @@ This guide walks you through enabling **Microsoft Agent 365** for the agent in
 this template so it can be provisioned, published, and deployed to your tenant
 using the **Agent 365 CLI** (`a365`).
 
-You have two options:
+The quickest way to get started is to use an AI Coding agent with this prompt, but this guide can be used for self installation as well
+> Help me provision this a365 agent following the step-by-step guide in this file. Some sections are marked as already configured and can be skipped. But otherwise, DO NOT skip steps. Ask users the right inputs (such as agent name) at the appropriate time. 
 
-- **[Option 1 — AI-guided setup](#option-1--ai-guided-setup-recommended)**: Hand the work off to an AI coding agent (GitHub Copilot, Claude, etc.) that follows the official Microsoft setup prompt end-to-end.
-- **[Option 2 — Manual setup](#option-2--manual-setup-step-by-step)**: Run every command yourself, step by step.
+---
 
-Both options follow the same source of truth:
-[https://aka.ms/agent365enable](https://aka.ms/agent365enable).
+## Tooling inventory
+
+These are a quick list of tools that will be used in this README. The step-by-step will also guide users on installing and configuring these tools so you can skip this section and go directly to the step-by-step if you are following along.
+
+| Tool | Why it's needed | Used in | Install |
+|---|---|---|---|
+| **.NET 8 runtime** | Required by the `a365` global tool (it's a `net8.0` package). A newer SDK alone is *not* enough — `dotnet --list-runtimes` must include `Microsoft.NETCore.App 8.0.x`. | All paths | <https://dotnet.microsoft.com/download/dotnet/8.0> |
+| **Agent 365 CLI (`a365`)** | Provisions the blueprint, registers the messaging endpoint, prints the blueprint client secret, etc. | All paths | `dotnet tool install --global Microsoft.Agents.A365.DevTools.Cli --prerelease` |
+| **Azure CLI (`az`)** | Cached login the `a365` CLI reuses; also used for direct resource inspection (`az containerapp logs`, `az role assignment`, etc.). | All paths | <https://learn.microsoft.com/cli/azure/install-azure-cli> |
+| **Python 3.11+** + **`uv`** | Runs the agent locally; `uv` resolves and locks the SDK dependency graph. | All paths | Python: <https://www.python.org/downloads/>. `uv`: `pip install uv` or <https://docs.astral.sh/uv/getting-started/installation/> |
+| **PowerShell 7+** | Needed for the `New-Agent365ToolsServicePrincipalProdPublic.ps1` script and assorted blueprint admin-consent fallbacks the CLI prints. | All paths (tenant setup) | <https://github.com/PowerShell/PowerShell> |
+| **Microsoft.Graph PowerShell modules** | Used by the same admin-consent fallback scripts. | Tenant setup | `Install-Module Microsoft.Graph.Authentication, Microsoft.Graph.Applications` |
+| **Azure Developer CLI (`azd`) v1.6+** | One-command provision + deploy for the Container Apps recipe (Recipe A). | Recipe A (`azd up`) | `winget install microsoft.azd` / <https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd> |
+| **Docker Desktop** *(or Podman)* | Local container builds. **Optional** for this repo — `azure.yaml` ships with `remoteBuild: true`, so ACR Tasks build the image when Docker isn't installed. Install Docker if you want to iterate on the image locally or run the agent in a local container. | Recipe A (optional), local container dev | <https://www.docker.com/products/docker-desktop/> |
+| **`devtunnel`** | Exposes a local `host_agent_server.py` over HTTPS so the blueprint can post Activities to your laptop while you debug. | Recipe B (dev-tunnel debugging) | <https://learn.microsoft.com/azure/developer/dev-tunnels/get-started> |
+| **Git** | Cloning this template and the `Agent365-devTools` repo for the tenant-tool SP script. | All paths | <https://git-scm.com/downloads> |
+
+> **Tenant prerequisites** (you don't install these — you request them):
+> Membership in the [Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/),
+> the **Agent ID Developer** Entra role (and **Application Administrator** /
+> **Global Administrator** for the consent fallback), **Contributor** on the
+> target Azure subscription, and an existing Azure OpenAI / Foundry account
+> with at least one model deployment.
 
 ---
 
@@ -77,43 +98,7 @@ Regardless of which option you choose, make sure you have:
 
 ---
 
-## Option 1 — AI-guided setup (recommended)
-
-Microsoft publishes an official prompt designed to be executed by an AI coding
-agent that has shell access. The prompt asks you a few questions, then runs the
-CLI commands and validates each step for you.
-
-### Steps
-
-1. **Open this workspace** in VS Code (or any IDE that hosts a tool-using AI agent — e.g. GitHub Copilot Chat in Agent Mode, Claude Code, Cursor).
-2. **Make sure the AI agent can:**
-   - Run shell commands in your terminal.
-   - Read files in this repo.
-   - Fetch web pages.
-3. **Send the agent this prompt:**
-
-   > Please follow the official Microsoft Agent 365 setup instructions at
-   > <https://aka.ms/agent365enable> to enable Agent 365 for this project.
-   > Use this repository as the project directory. Ask me the path-determination
-   > questions first, then execute every step end-to-end.
-
-4. **Answer the three path-determination questions** the agent will ask:
-   - **Is your agent already available in Teams or Copilot?** (Yes / No)
-   - **How will your agent authenticate to downstream APIs?** (OBO / S2S / Both)
-   - **Which Agent 365 capabilities do you want to enable?** (Register / Observability / AI Teammate)
-5. **Complete any interactive sign-in prompts** when they appear:
-   - `az login --allow-no-subscriptions` (Azure CLI sign-in).
-   - A Windows Account Manager (WAM) dialog or browser sign-in for the CLI's first Microsoft Graph token.
-6. **Review the dry-run output** the agent shows you before it applies changes, and reply `yes` to proceed.
-7. **Follow the post-deploy instructions** the agent surfaces (Teams Developer Portal configuration and agent instance creation — these are browser actions only you can do).
-
-That's it — the agent installs the CLI, validates prerequisites, runs
-`a365 setup all`, then `a365 publish` and `a365 deploy` (for the AI Teammate
-path), and reports the Setup Summary back to you.
-
----
-
-## Option 2 — Manual setup (step by step)
+## Step by step guide
 
 If you'd rather drive every step yourself, run the commands below in order.
 This mirrors the official prompt but condenses it for a human operator.
@@ -214,6 +199,7 @@ block in headless environments.
 > the standard flow does not require one.
 
 #### 2b. Roles check
+===For this tenant, this is already configured so you can skip this step.===
 
 Two different role systems apply — don't confuse them:
 
@@ -239,6 +225,7 @@ az role assignment list \
 ```
 
 #### 2c. Register the "Agent 365 CLI" Entra app and M365 Tools (one-time, per tenant)
+===For this tenant, we have already configured this so you can skip this step===
 
 The CLI auto-resolves a tenant Entra app by the **exact display name**
 `Agent 365 CLI`. You do **not** need to provide a client ID, but the app must
@@ -391,7 +378,7 @@ pip --version
 Then create and activate the venv exactly as in
 [README.md → Python Environment Configuration](../README.md#python-environment-configuration).
 
-### Step 3 — Configure (AI Teammate path only)
+### Step 3 — Configure AI Teammate
 From the **root of this repository**:
 
 ```bash
@@ -499,7 +486,7 @@ is the recommended path because Container Apps natively supports
 **system-assigned managed identity** — your agent can call Azure AI Foundry /
 Azure OpenAI without secrets.
 
-##### Recipe A — `azd up` (one command, recommended)
+##### Recipe A: `azd up` (one command, recommended)
 
 What's in the repo:
 

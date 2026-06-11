@@ -41,8 +41,8 @@ param containerCpu string = '0.5'
 @description('Container memory.')
 param containerMemory string = '1.0Gi'
 
-@description('Min replicas for autoscale.')
-@minValue(0)
+@description('Min replicas for autoscale. Must be >= 1 — the agent keeps in-memory per-channel sessions, so scaling to zero would drop conversation history on cold start.')
+@minValue(1)
 param minReplicas int = 1
 
 @description('Max replicas for autoscale.')

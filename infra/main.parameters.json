@@ -18,13 +18,13 @@
       "value": "${AZURE_OPENAI_RESOURCE_GROUP=rg-admin-terenceaifoundry}"
     },
     "azureOpenAiEndpoint": {
-      "value": "${AZURE_OPENAI_ENDPOINT=https://terenceaifoundry-resource.openai.azure.com/openai/v1}"
+      "value": "${AZURE_OPENAI_ENDPOINT=https://terenceaifoundry-resource.openai.azure.com}"
     },
     "azureOpenAiDeployment": {
       "value": "${AZURE_OPENAI_DEPLOYMENT=gpt-5.4}"
     },
     "azureOpenAiApiVersion": {
-      "value": "${AZURE_OPENAI_API_VERSION=2024-10-21}"
+      "value": "${AZURE_OPENAI_API_VERSION=preview}"
     },
     "blueprintClientId": {
       "value": "${BLUEPRINT_CLIENT_ID=}"

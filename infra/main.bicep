@@ -26,14 +26,14 @@ param azureOpenAiAccountName string = 'terenceaifoundry-resource'
 @description('Resource group containing the existing AOAI / Foundry account. The role assignment is created here.')
 param azureOpenAiResourceGroup string = 'rg-admin-terenceaifoundry'
 
-@description('Public endpoint of the AOAI / Foundry account.')
-param azureOpenAiEndpoint string = 'https://terenceaifoundry-resource.openai.azure.com/openai/v1'
+@description('Public endpoint of the AOAI / Foundry account. Use the **resource root** (no trailing `/openai/v1`) — `OpenAIChatClient(azure_endpoint=...)` appends `/openai/v1/responses` itself, so a `.../openai/v1` value produces a doubled path that 404s.')
+param azureOpenAiEndpoint string = 'https://terenceaifoundry-resource.openai.azure.com'
 
 @description('Model deployment name on the AOAI / Foundry account.')
 param azureOpenAiDeployment string = 'gpt-5.4'
 
-@description('Azure OpenAI API version the chat client will use.')
-param azureOpenAiApiVersion string = '2024-10-21'
+@description('Azure OpenAI API version the chat client will use. The `/openai/v1/responses` endpoint on some Foundry accounts only accepts the rolling `preview` literal; datestamped previews (e.g. `2025-04-01-preview`) return `API version not supported`.')
+param azureOpenAiApiVersion string = 'preview'
 
 @description('Container CPU (cores). 0.5 is the smallest sane size for Python aiohttp.')
 param containerCpu string = '0.5'

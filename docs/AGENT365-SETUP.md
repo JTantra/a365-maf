@@ -65,6 +65,10 @@ The full reference is at <https://learn.microsoft.com/microsoft-agent-365/develo
 | `a365 setup blueprint --agent-name <name> --update-endpoint <url>` | Change just the messaging endpoint (e.g. dev tunnel URL rotated). |
 | `a365 setup blueprint --agent-name <name> --show-secret` | Print the blueprint's client secret (Windows, same machine/user that ran setup). |
 | `a365 setup permissions mcp --agent-name <name>` | Re-grant MCP server OAuth2 grants on the existing blueprint. Also `permissions bot` / `permissions custom` / `permissions copilotstudio`. |
+| `a365 develop list-available` | List built-in MCP servers in the tenant catalog (what you can install). |
+| `a365 develop list-configured` | List MCP servers currently wired into this agent (reads `ToolingManifest.json`). |
+| `a365 develop add-mcp-servers <name> [<name>...]` | Add one or more built-in MCP servers to the agent (updates `ToolingManifest.json`). |
+| `a365 develop remove-mcp-servers <name> [<name>...]` | Remove built-in MCP servers from the agent. |
 | `a365 publish` | Inject IDs into `manifest/manifest.json`, package it, register with the tenant catalog. |
 | `a365 setup blueprint --agent-name <name> --endpoint-only --messaging-endpoint <url>` | Register the URL of your deployed host with an existing blueprint. Run this **after** you ship the code to Container Apps / Web App / dev tunnel / etc. |
 | `a365 query-entra ...` | Inspect scopes, permissions, and consent status of any Entra app/SP in the tenant. |
@@ -378,6 +382,124 @@ pip --version
 Then create and activate the venv exactly as in
 [README.md → Python Environment Configuration](../README.md#python-environment-configuration).
 
+#### 2e. Select built-in MCP tools (optional)
+
+This template ships with one MCP server wired up in
+[ToolingManifest.json](../ToolingManifest.json). If that's
+all you need, **skip this step**. Otherwise pick the built-in MCP servers you
+want the agent to call (Mail, SharePoint, Word, Excel, PowerPoint, etc.)
+**before** running `a365 setup all`, because the CLI reads
+`ToolingManifest.json` to decide which OAuth2 scopes to grant on the
+blueprint.
+
+1. **See the catalog** for your tenant:
+
+   ```bash
+   a365 develop list-available
+   ```
+
+   Prints each MCP server's name, unique name, audience GUID, and scope.
+
+2. **Add** the servers you want:
+
+   ```bash
+   a365 develop add-mcp-servers mcp_MailTools mcp_SharePointTools mcp_WordTools
+   ```
+
+   This rewrites [ToolingManifest.json](../ToolingManifest.json) — do **not**
+   hand-edit that file.
+
+3. **Verify** what's now configured:
+
+   ```bash
+   a365 develop list-configured
+   ```
+
+4. **Remove** servers you no longer want:
+
+   ```bash
+   a365 develop remove-mcp-servers mcp_WordTools
+   ```
+
+> Selection is **per blueprint** — every agent instance created from this
+> blueprint inherits the same MCP set. If you change the manifest *after*
+> Step 4, re-grant the new scopes with
+> `a365 setup permissions mcp --agent-name <name>` (or just re-run
+> `a365 setup all`, which is idempotent). No agent code changes are needed —
+> `McpToolRegistrationService` picks up the new servers on the next turn.
+
+#### 2f. Use the canonical `McpServers.*.All` scopes (Word, OneDrive, Excel, Teams, etc.)
+
+The `a365 develop list-available` catalog shows several "Work IQ" servers
+(e.g. `mcp_WordServer`, `mcp_OneDriveRemoteServer`) listed against
+*separate* audience apps with a generic `Tools.ListInvoke.All` scope.
+**Don't use those audiences** — `a365 setup permissions mcp` can't grant
+inheritable consent on them, so the agent *instance* will fail every
+activity with `AADSTS65001 ... has not consented to use the application
+'<agent-instance-id>'` and `Failed to obtain token for agentic activity`.
+
+The canonical **Agent 365 Tools** resource app
+(`ea9ffc3e-8a23-4a7d-836d-234d7c7565c1`) exposes a parallel
+`McpServers.<Workload>.All` scope for each of those servers, and *that*
+path supports inheritable consent on the instance. Use these in
+[ToolingManifest.json](../ToolingManifest.json):
+
+| MCP server | Scope (use this) | Audience |
+|---|---|---|
+| `mcp_MailTools` | `McpServers.Mail.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_CalendarTools` | `McpServers.Calendar.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_WordServer` | `McpServers.Word.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_ExcelServer` | `McpServers.Excel.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_ODSPRemoteServer` | `McpServers.OneDriveSharepoint.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_SharePointListsTools` | `McpServers.SharepointLists.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_PlannerServer` | `McpServers.Planner.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_TeamsServer` | `McpServers.Teams.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_M365Copilot` | `McpServers.CopilotMCP.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_KnowledgeTools` | `McpServers.Knowledge.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_DASearch` | `McpServers.DASearch.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+| `mcp_MeServer` | `McpServers.Me.All` | `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` |
+
+Hand-edit `ToolingManifest.json` to set the audience and scope to the
+values in the table (the `a365 develop add-mcp-servers` command may pick the
+Work IQ audience by default — verify and replace).
+
+Then a single command propagates everything end-to-end:
+
+```bash
+a365 setup permissions mcp --agent-name <your-agent-base-name>
+```
+
+It opens a browser tab; sign in and click Accept. The CLI then:
+
+1. Adds each scope to the blueprint's `requiredResourceAccess`.
+2. Grants the OAuth2 tenant-wide consent (`AllPrincipals`) to the blueprint SP.
+3. Marks the resource as *inheritable* so each agent instance (Jojo, etc.) gets the same grant on activation.
+
+Verify:
+
+```bash
+# Service-principal object id is in a365.generated.config.json
+# (agentBlueprintServicePrincipalObjectId)
+az rest --method GET \
+  --url "https://graph.microsoft.com/v1.0/servicePrincipals/<sp-object-id>/oauth2PermissionGrants" \
+  --query "value[].{resource:resourceId,scope:scope}" -o json
+```
+
+You should see all the `McpServers.*.All` scopes in a single grant against
+resource `ee464f5a-3cdf-460f-b569-9eebae15d1b7` (the **Agent 365 Tools** SP).
+
+Finally **restart the agent process** — MCP servers are discovered on first
+request after startup, so a running server won't pick up newly-granted
+scopes until restart.
+
+> ⚠️ **Don't confuse the two audiences.** If you ever see
+> `c2d0c2b6-...` (Work IQ Word MCP), `b0b2a2bb-...` (Work IQ OneDrive), or
+> any audience other than `ea9ffc3e-...` in your blueprint's
+> `requiredResourceAccess`, the agent instance won't be able to mint a
+> token. Remove those entries via the Entra portal or
+> `az ad app update --required-resource-accesses` and stick to the
+> canonical Tools resource.
+
 ### Step 3 — Configure AI Teammate
 From the **root of this repository**:
 
@@ -535,7 +657,7 @@ az account set --subscription <your-subscription-id>
 
 # Create the azd environment and set the location. The template creates a
 # NEW resource group for the workload — no need to pre-create one.
-azd env new agent365-dev                          # creates .azure/agent365-dev
+azd env new <resource_group_name>                          # creates .azure/agent365-dev
 azd env set AZURE_LOCATION southeastasia
 
 # Optional overrides (defaults shown):
@@ -680,6 +802,151 @@ These are manual and must be done by you in a browser.
 
 ---
 
+## Appendix A — Register a custom MCP server
+
+Use this when you need to call **your own** MCP server (one not in the A365
+catalog returned by `a365 develop list-available`). The platform's
+`McpToolRegistrationService` only discovers built-in catalog MCPs, so a
+custom MCP is wired in via **Agent Framework primitives** alongside the
+A365-managed ones.
+
+### When you need this
+
+- You operate the MCP server yourself (internal HR system, Dataverse-hosted
+  MCP, on-prem connector, etc.).
+- The MCP is published to a Dataverse environment (`a365 develop-mcp publish`)
+  but not yet in the global catalog.
+- You're prototyping locally against a `stdio` or `http` MCP before publishing.
+
+If your MCP is **already in the A365 catalog**, use Step 2e instead — that path
+gives you free per-audience OBO auth and zero code changes.
+
+### A.1 — Pick a transport
+
+| Transport | Agent Framework class | When to use |
+|---|---|---|
+| Streamable HTTP | `MCPStreamableHTTPTool` | Remote HTTP/HTTPS MCP servers (most common) |
+| Stdio (local process) | `MCPStdioTool` | Local `npx`/`uvx` MCP servers for dev |
+| WebSocket | `MCPWebsocketTool` | Servers that only expose a WS endpoint |
+
+All three are imported from `agent_framework`.
+
+### A.2 — Wire the MCP into the agent
+
+There are two places to add it. Pick **A** (recommended) if you also want the
+built-in A365 MCPs; pick **B** if your agent only uses custom tools.
+
+**Option A — Pass it through `initial_tools` (keeps A365 MCPs)**
+
+Edit `setup_mcp_servers()` in [agent.py](../agent.py) so the custom MCP is
+included in `initial_tools` handed to
+`McpToolRegistrationService.add_tool_servers_to_agent`:
+
+```python
+from agent_framework import MCPStreamableHTTPTool
+import httpx
+
+# Build any auth headers your MCP needs (the A365 service only injects
+# per-audience tokens for catalog MCPs — your server is on its own).
+custom_headers = {"Authorization": f"Bearer {os.getenv('CUSTOM_MCP_TOKEN', '')}"}
+custom_http = httpx.AsyncClient(headers=custom_headers, timeout=90.0)
+
+custom_mcp = MCPStreamableHTTPTool(
+    name="my_custom_mcp",
+    url=os.getenv("CUSTOM_MCP_URL"),       # e.g. https://my-mcp.example.com/mcp
+    http_client=custom_http,
+    description="My custom MCP server",
+)
+
+self.agent = await self.tool_service.add_tool_servers_to_agent(
+    chat_client=self.chat_client,
+    agent_instructions=agent_instructions,
+    initial_tools=[custom_mcp],            # <-- your MCP joins A365 MCPs
+    auth=auth,
+    auth_handler_name=auth_handler_name,
+    auth_token=self.auth_options.bearer_token,   # omit when use_agentic_auth=True
+    turn_context=context,
+)
+```
+
+Remember to `await custom_http.aclose()` in `cleanup()` so the connection
+pool is released.
+
+**Option B — Skip the A365 registration service entirely**
+
+If you don't use any built-in A365 MCPs, build the agent directly in
+`_create_agent()`:
+
+```python
+from agent_framework import Agent, MCPStreamableHTTPTool
+
+custom_mcp = MCPStreamableHTTPTool(
+    name="my_custom_mcp",
+    url=os.getenv("CUSTOM_MCP_URL"),
+)
+
+self.agent = Agent(
+    client=self.chat_client,
+    instructions=self.AGENT_PROMPT,
+    tools=[custom_mcp],
+)
+```
+
+…then short-circuit `setup_mcp_servers()` (return early) so the registration
+service doesn't rebuild the agent and drop your tool.
+
+### A.3 — Authentication patterns
+
+| Auth model | What to do |
+|---|---|
+| **Static key / PAT** | Inject `Authorization: Bearer <pat>` via the `httpx.AsyncClient` headers as shown above. |
+| **OBO from the agent's identity** | Call `await auth.exchange_token(turn_context, [scope], auth_handler_name)` inside `setup_mcp_servers()` and use the returned token in the header. The scope must match the resource your MCP validates against (a custom Entra app you registered — see A.4). |
+| **No auth (dev)** | Omit `http_client`; `MCPStreamableHTTPTool` will create its own. |
+
+### A.4 — (Optional) Register the custom resource with the blueprint
+
+Required only if your MCP validates **agent identity tokens** issued for a
+custom Entra resource. Grant the scope on the blueprint so OBO exchange works:
+
+```bash
+a365 setup permissions custom \
+  --agent-name <your-agent-base-name> \
+  --resource-app-id <custom-mcp-app-id> \
+  --scopes "MyMcp.Read,MyMcp.Write"
+```
+
+This adds an OAuth2 grant + inheritable permission on the blueprint SP, so
+every agent instance spawned from it can OBO-exchange a token for your MCP.
+
+### A.5 — (Optional) Publish into a Dataverse environment
+
+If your custom MCP lives in Dataverse, the CLI can publish it so it appears
+in `list-available` for callers in that environment:
+
+```bash
+a365 develop-mcp list-environments
+a365 develop-mcp publish --environment <env-name> ...        # see --help
+a365 develop-mcp register-external-mcp-server --help         # for external endpoints
+```
+
+After publish, your custom MCP becomes a regular catalog entry and you can
+switch from the code path above to the simpler `a365 develop add-mcp-servers`
+flow from Step 2e.
+
+### A.6 — Smoke test
+
+1. Start the host locally (`./scripts/run-local-agentic.ps1`).
+2. Send a message that should trigger the tool.
+3. Look for these log lines from `McpToolRegistrationService`:
+   - `Created MCP plugin for 'my_custom_mcp' at <url>`
+   - `Added MCP plugin 'my_custom_mcp' to agent tools`
+   - `Agent created with N total tools` (N includes your custom MCP + catalog MCPs)
+4. If the tool isn't called, check that the LLM has a clear description (set
+   `description=` on the `MCPStreamableHTTPTool`) and that the MCP server's
+   `tools/list` returns the tool you expect.
+
+---
+
 ## Troubleshooting quick reference
 
 | Symptom | Fix |
@@ -695,6 +962,9 @@ These are manual and must be done by you in a browser.
 | CLI reports missing `AgentRegistration.ReadWrite.All`, `http://localhost:8400/`, or `wids` claim | Re-run `a365 setup requirements --agent-name <name>` and accept the proposed changes, or apply them manually per Step 2c Option A (steps 4 and 6). |
 | `Operation cannot be completed without additional quota` | Azure region/SKU quota hit — pick a different region and retry. |
 | Publish fails reaching admin center | Custom client app missing `Application.ReadWrite.All`; have an admin grant it. |
+| Agent reply says "I don't have access to Word/OneDrive/SharePoint" even though the server is in `ToolingManifest.json` | The manifest entry likely uses a "Work IQ" audience (`c2d0c2b6-...`, `b0b2a2bb-...`, etc.) — those don't propagate to the agent instance. Replace the entry to use the canonical `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` audience with the corresponding `McpServers.<Workload>.All` scope (see Step 2f), then re-run `a365 setup permissions mcp --agent-name <name>` and restart the agent. |
+| Agent server crashes every activity with `AADSTS65001 ... has not consented to use the application '<agent-instance-id>'` and `Failed to obtain token for agentic activity` right after adding a new MCP scope | The blueprint's `requiredResourceAccess` references a resource the agent instance can't get an inheritable grant for — usually a "Work IQ" audience added via `a365 setup permissions custom`. Remove the offending entry from the blueprint app (Entra portal → API permissions, or `az ad app update`), then re-run `a365 setup permissions mcp --agent-name <name>` (which uses the canonical `ea9ffc3e-...` audience) and restart. |
+| `a365 setup permissions custom` prints `OAuth2 permission grant failed (non-transient) ... Authorization_RequestDenied` even on a "Work IQ" audience as a Global Administrator | This usually means the resource doesn't support delegated tenant-wide consent through the CLI's path. Prefer the canonical `McpServers.*.All` scopes on the Agent 365 Tools resource (Step 2f) — they always work. |
 | Need detailed logs | Re-run with `-v` / `--verbose`. Logs live at `%APPDATA%/a365/logs/` (Windows) or `~/.config/a365/logs/` (Linux/macOS). |
 
 For deeper diagnostics see the

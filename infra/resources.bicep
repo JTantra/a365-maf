@@ -135,6 +135,14 @@ var baseEnv = [
   { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAiEndpoint }
   { name: 'AZURE_OPENAI_DEPLOYMENT', value: azureOpenAiDeployment }
   { name: 'AZURE_OPENAI_API_VERSION', value: azureOpenAiApiVersion }
+  // Force the A365 tooling SDK into "production" mode so MCP server discovery
+  // goes through the platform gateway (which uses the blueprint credentials
+  // via OBO exchange), not the local ToolingManifest.json + BEARER_TOKEN_*
+  // fallback. The tooling SDK's `is_development_environment()` defaults to
+  // "Development" when no env var is set; without this override, the
+  // Container App skips attaching an Authorization header on MCP requests and
+  // gets 400 "Tenant id is invalid" from the MCP service.
+  { name: 'PYTHON_ENVIRONMENT', value: 'Production' }
 ]
 
 var authEnv = authEnabled ? [

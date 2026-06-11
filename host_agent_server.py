@@ -14,7 +14,7 @@ from aiohttp.web import Application, Request, Response, json_response, run_app
 from aiohttp.web_middlewares import middleware as web_middleware
 from dotenv import load_dotenv
 from agent_interface import AgentInterface, check_agent_inheritance
-from microsoft_agents.activity import load_configuration_from_env, Activity, ActivityTypes
+from microsoft_agents.activity import load_configuration_from_env, Activity, ActivityTypes, DeliveryModes
 from microsoft_agents.authentication.msal import MsalConnectionManager
 from microsoft_agents.hosting.aiohttp import (
     CloudAdapter,
@@ -202,9 +202,106 @@ class GenericAgentHost:
             elif action == "remove":
                 await context.send_activity("Thank you for your time, I enjoyed working with you.")
 
+        # NOTE: Register the agents-channel notification handler BEFORE on_message.
+        # AgentApplication evaluates routes in registration order and stops at the
+        # first match (`break`). The on_message handler below matches *any*
+        # `message`-type activity, including A365 notification surfaces
+        # (email / Word / Excel / PowerPoint) that arrive as message-type on
+        # channel_id="agents:<sub>". Registering the notification route first
+        # lets it claim those activities; on_message then only sees conversational
+        # channels (msteams, directline, emulator, webchat, ...).
+        @self.agent_notification.on_agent_notification(
+            channel_id=ChannelId(channel="agents", sub_channel="*"),
+            **handler_config,
+        )
+        async def on_notification(
+            context: TurnContext,
+            state: TurnState,
+            notification_activity: AgentNotificationActivity,
+        ):
+            try:
+                # A365 notification surfaces (email, Word/Excel/PowerPoint comments)
+                # don't accept connector replies — the conversation/activity URL
+                # returned in the Activity's service URL 404s on POST. Force
+                # expect_replies on the incoming activity so the TurnContext
+                # buffers our outbound activities and the SDK returns them in
+                # the HTTP response body of the original notification POST.
+                # See microsoft_agents/hosting/core/turn_context.py:239 and
+                # channel_service_adapter.py:_process_turn_results.
+                context.activity.delivery_mode = DeliveryModes.expect_replies
+                logger.info(
+                    "📬 notification: type=%s channel=%s sub_channel=%s delivery_mode=%s",
+                    notification_activity.notification_type,
+                    getattr(context.activity.channel_id, "channel", None),
+                    getattr(context.activity.channel_id, "sub_channel", None),
+                    context.activity.delivery_mode,
+                )
+
+                result = await self._validate_agent_and_setup_context(context)
+                if result is None:
+                    return
+                tenant_id, agent_id = result
+
+                with BaggageBuilder().tenant_id(tenant_id).agent_id(agent_id).build():
+                    if not hasattr(
+                        self.agent_instance, "handle_agent_notification_activity"
+                    ):
+                        logger.warning("⚠️ Agent doesn't support notifications")
+                        await context.send_activity(
+                            "This agent doesn't support notification handling yet."
+                        )
+                        return
+
+                    response = (
+                        await self.agent_instance.handle_agent_notification_activity(
+                            notification_activity, self.agent_app.auth, self.auth_handler_name, context
+                        )
+                    )
+
+                    logger.info("📤 outbound response (%d chars): %s",
+                                len(response or ""),
+                                (response or "")[:500])
+
+                    if notification_activity.notification_type == NotificationTypes.EMAIL_NOTIFICATION:
+                        response_activity = EmailResponse.create_email_response_activity(response)
+                        await context.send_activity(response_activity)
+                        logger.info(
+                            "📦 buffered_reply_activities=%d (delivery_mode=%s)",
+                            len(getattr(context, "buffered_reply_activities", []) or []),
+                            context.activity.delivery_mode,
+                        )
+                        return
+
+                    await context.send_activity(response)
+                    logger.info(
+                        "📦 buffered_reply_activities=%d (delivery_mode=%s)",
+                        len(getattr(context, "buffered_reply_activities", []) or []),
+                        context.activity.delivery_mode,
+                    )
+
+            except Exception as e:
+                logger.error(f"❌ Notification error: {e}", exc_info=True)
+                # Don't try to send an error message back — the channel may not
+                # support replies (and the original send already failed). The
+                # framework will surface a generic 500 / empty 200 to the caller.
+
         @self.agent_app.activity("message", **handler_config)
         async def on_message(context: TurnContext, _: TurnState):
             try:
+                # Defense in depth: the notification handler above already claims
+                # agents-channel activities. This guard catches the case where
+                # routing order changes or a new sub_channel arrives before the
+                # notification handler is updated.
+                ch = context.activity.channel_id
+                ch_channel = getattr(ch, "channel", str(ch) if ch else "")
+                if ch_channel == "agents":
+                    logger.warning(
+                        "on_message reached for agents-channel activity (sub_channel=%s); "
+                        "notification handler should have claimed it. Dropping to avoid 404.",
+                        getattr(ch, "sub_channel", None),
+                    )
+                    return
+
                 result = await self._validate_agent_and_setup_context(context)
                 if result is None:
                     return
@@ -214,6 +311,35 @@ class GenericAgentHost:
                     user_message = context.activity.text or ""
                     if not user_message.strip() or user_message.strip() == "/help":
                         return
+
+                    # Surface attached files (Teams paperclip, drag-and-drop, etc.) to
+                    # the LLM. Teams sends them as activity.attachments with the file's
+                    # SharePoint/OneDrive URL and drive-item id in content/content_url.
+                    attachments = getattr(context.activity, "attachments", None) or []
+                    attachment_lines = []
+                    for att in attachments:
+                        name = getattr(att, "name", None) or ""
+                        content_url = getattr(att, "content_url", None) or ""
+                        content = getattr(att, "content", None) or {}
+                        if isinstance(content, dict):
+                            download_url = content.get("downloadUrl") or content.get("contentUrl") or ""
+                            unique_id = content.get("uniqueId") or ""
+                            file_type = content.get("fileType") or ""
+                        else:
+                            download_url = getattr(content, "download_url", "") or getattr(content, "content_url", "") or ""
+                            unique_id = getattr(content, "unique_id", "") or ""
+                            file_type = getattr(content, "file_type", "") or ""
+                        url = content_url or download_url
+                        if name or url or unique_id:
+                            attachment_lines.append(
+                                f"- name={name!r} url={url!r} uniqueId={unique_id!r} fileType={file_type!r}"
+                            )
+                    if attachment_lines:
+                        user_message = (
+                            f"{user_message}\n\nThe user attached the following file(s):\n"
+                            + "\n".join(attachment_lines)
+                        )
+                        logger.info(f"📎 {len(attachment_lines)} attachment(s) extracted")
 
                     logger.info(f"📨 {user_message}")
 
@@ -251,52 +377,6 @@ class GenericAgentHost:
                 logger.error(f"❌ Error: {e}")
                 await context.send_activity(f"Sorry, I encountered an error: {str(e)}")
 
-        @self.agent_notification.on_agent_notification(
-            channel_id=ChannelId(channel="agents", sub_channel="*"),
-            **handler_config,
-        )
-        async def on_notification(
-            context: TurnContext,
-            state: TurnState,
-            notification_activity: AgentNotificationActivity,
-        ):
-            try:
-                result = await self._validate_agent_and_setup_context(context)
-                if result is None:
-                    return
-                tenant_id, agent_id = result
-
-                with BaggageBuilder().tenant_id(tenant_id).agent_id(agent_id).build():
-                    logger.info(f"📬 {notification_activity.notification_type}")
-
-                    if not hasattr(
-                        self.agent_instance, "handle_agent_notification_activity"
-                    ):
-                        logger.warning("⚠️ Agent doesn't support notifications")
-                        await context.send_activity(
-                            "This agent doesn't support notification handling yet."
-                        )
-                        return
-
-                    response = (
-                        await self.agent_instance.handle_agent_notification_activity(
-                            notification_activity, self.agent_app.auth, self.auth_handler_name, context
-                        )
-                    )
-
-                    if notification_activity.notification_type == NotificationTypes.EMAIL_NOTIFICATION:
-                        response_activity = EmailResponse.create_email_response_activity(response)
-                        await context.send_activity(response_activity)
-                        return
-
-                    await context.send_activity(response)
-
-            except Exception as e:
-                logger.error(f"❌ Notification error: {e}")
-                await context.send_activity(
-                    f"Sorry, I encountered an error processing the notification: {str(e)}"
-                )
-
     # --- Agent Initialization ---
     async def initialize_agent(self):
         if self.agent_instance is None:
@@ -328,9 +408,21 @@ class GenericAgentHost:
     # --- Server ---
     def start_server(self, auth_configuration: AgentAuthConfiguration | None = None):
         async def entry_point(req: Request) -> Response:
-            return await start_agent_process(
+            resp = await start_agent_process(
                 req, req.app["agent_app"], req.app["adapter"]
             )
+            # Diagnostic: log every outbound HTTP response so we can see whether
+            # the SDK is returning the buffered ExpectedReplies payload.
+            try:
+                body_len = len(resp.body) if resp.body else 0
+                logger.info(
+                    "📡 HTTP %s -> status=%s body_len=%s body_preview=%s",
+                    req.path, resp.status, body_len,
+                    (resp.body[:300].decode("utf-8", errors="replace") if resp.body else "(empty)"),
+                )
+            except Exception as log_ex:
+                logger.warning("response-logger failed: %s", log_ex)
+            return resp
 
         async def health(_req: Request) -> Response:
             return json_response(
@@ -351,7 +443,13 @@ class GenericAgentHost:
                 # can reach /api/health without a bearer token.
                 if request.path == "/api/health":
                     return await handler(request)
-                return await jwt_authorization_middleware(request, handler)
+                resp = await jwt_authorization_middleware(request, handler)
+                logger.info(
+                    "🛂 jwt_mw post: status=%s body_len=%s",
+                    getattr(resp, "status", "?"),
+                    len(resp.body) if getattr(resp, "body", None) else 0,
+                )
+                return resp
 
             middlewares.append(jwt_with_health_bypass)
 
@@ -366,7 +464,13 @@ class GenericAgentHost:
                     False,
                     "Anonymous",
                 )
-            return await handler(request)
+            resp = await handler(request)
+            logger.info(
+                "🕊 anon_mw post: status=%s body_len=%s",
+                getattr(resp, "status", "?"),
+                len(resp.body) if getattr(resp, "body", None) else 0,
+            )
+            return resp
 
         middlewares.append(anonymous_claims)
         app = Application(middlewares=middlewares)

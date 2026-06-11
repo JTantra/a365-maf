@@ -121,7 +121,9 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = 
 // Image starts as a placeholder; `azd deploy` overrides it via the
 // `containerapp update --image` call after pushing to the registry.
 
-var placeholderImage = 'mcr.microsoft.com/k8se/quickstart:latest'
+@description('Initial container image reference. Override on first provision when a real image already exists in ACR (k8se/quickstart listens on port 80 and fails the 3978 probe).')
+param initialImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+var placeholderImage = initialImage
 var resolvedTenantId = empty(blueprintTenantId) ? subscription().tenantId : blueprintTenantId
 var authEnabled = !empty(blueprintClientId) && !empty(blueprintClientSecret)
 

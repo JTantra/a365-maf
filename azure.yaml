@@ -22,6 +22,7 @@ services:
     docker:
       path: ./Dockerfile
       context: .
+      remoteBuild: true
 
 hooks:
   # After `azd up` / `azd deploy` finishes, remind the operator to register

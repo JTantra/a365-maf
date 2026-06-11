@@ -64,6 +64,9 @@ param blueprintTenantId string = ''
 @secure()
 param blueprintClientSecret string = ''
 
+@description('Initial container image reference for the first provision. Override when a real image already exists in ACR.')
+param initialImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+
 // ----- Resource group ------------------------------------------------------
 
 resource workloadRg 'Microsoft.Resources/resourceGroups@2024-03-01' = {
@@ -94,6 +97,7 @@ module workload 'resources.bicep' = {
     blueprintClientId: blueprintClientId
     blueprintTenantId: blueprintTenantId
     blueprintClientSecret: blueprintClientSecret
+    initialImage: initialImage
   }
 }
 

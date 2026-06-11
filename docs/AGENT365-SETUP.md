@@ -512,7 +512,8 @@ What's in the repo:
 Pre-reqs:
 
 - [Azure Developer CLI (`azd`) v1.6+](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd).
-- An existing Azure OpenAI / Foundry account with at least one model deployment. By default this template targets `terenceaifoundry-resource` in `terenceaifoundry-rg` (endpoint `https://terenceaifoundry-resource.openai.azure.com/openai/v1`, deployment `gpt-5.4`). Override with `AZURE_OPENAI_*` env vars below.
+- **Either** Docker (or Podman) on the build machine, **or** set `remoteBuild: true` under the `docker:` section in [`azure.yaml`](../azure.yaml) so the image is built by ACR Tasks instead. The repo ships with `remoteBuild: true` so `azd up` works out of the box without a local container runtime.
+- An existing Azure OpenAI / Foundry account with at least one model deployment. By default this template targets `terenceaifoundry-resource` in `rg-admin-terenceaifoundry` (endpoint `https://terenceaifoundry-resource.openai.azure.com/openai/v1`, deployment `gpt-5.4`). Override with `AZURE_OPENAI_*` env vars below.
 - Azure CLI logged in (`az login`) with **Contributor** on the target subscription and **User Access Administrator** (or **Owner**) on both the new workload RG and the Foundry account's RG, so role assignments can be created.
 
 Deploying with auth is a **two-pass** flow because the Container App's public
@@ -521,6 +522,23 @@ and the blueprint client secret only exists after `a365 setup all` (Step 4)
 has created the blueprint. Both passes use the same `azd up`.
 
 ###### Pass 1 — provision + deploy in anonymous mode
+
+> **First-revision gotcha.** The Container App is created with a placeholder
+> image (`mcr.microsoft.com/k8se/quickstart`) that listens on port 80, so the
+> very first provision's port-3978 startup probe will fail and the deployment
+> will time out with `ContainerAppOperationError: Operation expired`. There are
+> two ways through this:
+>
+> 1. **Pre-build the image** with `az acr build --registry <acr> --image agent:initial .` after the registry exists (you can fast-fail the first `azd up` to create the ACR, then re-run), and pass `INITIAL_IMAGE=<acr>.azurecr.io/agent:initial` via `azd env set` before re-running `azd up`. The Bicep template uses that as the first-revision image so the probe passes immediately.
+> 2. **Race-fix the AcrPull role assignment.** Even with the right image, the system MI's `AcrPull` role on the registry may not propagate before the first revision tries to pull. Grant it manually:
+>
+>    ```bash
+>    MI=$(az containerapp show -n <container-app> -g <rg> --query identity.principalId -o tsv)
+>    ACR_ID=$(az acr show -n <acr> -g <rg> --query id -o tsv)
+>    az role assignment create --assignee-object-id $MI --assignee-principal-type ServicePrincipal --role AcrPull --scope $ACR_ID
+>    ```
+>
+>    Then re-run `azd provision`.
 
 ```bash
 # One-time: log in and choose the subscription.
@@ -536,7 +554,7 @@ azd env set AZURE_LOCATION southeastasia
 # Optional overrides (defaults shown):
 # azd env set AZURE_RESOURCE_GROUP        rg-agent365-dev
 # azd env set AZURE_OPENAI_ACCOUNT_NAME   terenceaifoundry-resource
-# azd env set AZURE_OPENAI_RESOURCE_GROUP terenceaifoundry-rg
+# azd env set AZURE_OPENAI_RESOURCE_GROUP rg-admin-terenceaifoundry
 # azd env set AZURE_OPENAI_ENDPOINT       https://terenceaifoundry-resource.openai.azure.com/openai/v1
 # azd env set AZURE_OPENAI_DEPLOYMENT     gpt-5.4
 # azd env set AZURE_OPENAI_API_VERSION    2024-10-21

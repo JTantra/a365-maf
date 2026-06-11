@@ -57,4 +57,4 @@ sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:'+__import__('os').enviro
     || exit 1
 
 # Entrypoint binds 0.0.0.0:$PORT and serves /api/messages + /api/health.
-CMD ["python", "host_agent_server.py"]
+CMD ["python", "start_with_generic_host.py"]

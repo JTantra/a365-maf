@@ -143,6 +143,10 @@ var baseEnv = [
   // Container App skips attaching an Authorization header on MCP requests and
   // gets 400 "Tenant id is invalid" from the MCP service.
   { name: 'PYTHON_ENVIRONMENT', value: 'Production' }
+  // Ship traces/metrics/logs to the A365 observability backend. Without this
+  // the microsoft-opentelemetry distro generates spans locally but does not
+  // export them, so the A365 dashboard for this agent will be empty.
+  { name: 'ENABLE_A365_OBSERVABILITY_EXPORTER', value: 'true' }
 ]
 
 var authEnv = authEnabled ? [

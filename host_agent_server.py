@@ -187,20 +187,20 @@ class GenericAgentHost:
         self.agent_app.message("/help", **handler_config)(help_handler)
 
         # Handle agent install / uninstall events (agentInstanceCreated / InstallationUpdate)
-        @self.agent_app.activity("installationUpdate")
-        async def on_installation_update(context: TurnContext, _: TurnState):
-            action = context.activity.action
-            from_prop = context.activity.from_property
-            logger.info(
-                "InstallationUpdate received — Action: '%s', DisplayName: '%s', UserId: '%s'",
-                action or "(none)",
-                getattr(from_prop, "name", "(unknown)") if from_prop else "(unknown)",
-                getattr(from_prop, "id", "(unknown)") if from_prop else "(unknown)",
-            )
-            if action == "add":
-                await context.send_activity("Thank you for hiring me! Looking forward to assisting you in your professional journey!")
-            elif action == "remove":
-                await context.send_activity("Thank you for your time, I enjoyed working with you.")
+        # @self.agent_app.activity("installationUpdate", **handler_config)
+        # async def on_installation_update(context: TurnContext, _: TurnState):
+        #     action = context.activity.action
+        #     from_prop = context.activity.from_property
+        #     logger.info(
+        #         "InstallationUpdate received — Action: '%s', DisplayName: '%s', UserId: '%s'",
+        #         action or "(none)",
+        #         getattr(from_prop, "name", "(unknown)") if from_prop else "(unknown)",
+        #         getattr(from_prop, "id", "(unknown)") if from_prop else "(unknown)",
+        #     )
+        #     if action == "add":
+        #         await context.send_activity("Thank you for hiring me! Looking forward to assisting you in your professional journey!")
+        #     elif action == "remove":
+        #         await context.send_activity("Thank you for your time, I enjoyed working with you.")
 
         # NOTE: Register the agents-channel notification handler BEFORE on_message.
         # AgentApplication evaluates routes in registration order and stops at the
@@ -261,6 +261,14 @@ class GenericAgentHost:
                     logger.info("📤 outbound response (%d chars): %s",
                                 len(response or ""),
                                 (response or "")[:500])
+
+                    # Lifecycle / ACK notifications (and any handler that returns
+                    # an empty string) have no reply target — sending anything
+                    # triggers 502s from the connector. Skip cleanly.
+                    if not (response or "").strip():
+                        logger.info("📭 Empty response; skipping send_activity for %s",
+                                    notification_activity.notification_type)
+                        return
 
                     if notification_activity.notification_type == NotificationTypes.EMAIL_NOTIFICATION:
                         response_activity = EmailResponse.create_email_response_activity(response)

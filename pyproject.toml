@@ -6,9 +6,12 @@ authors = [
     { name = "Microsoft", email = "support@microsoft.com" }
 ]
 dependencies = [
-    # AgentFramework SDK - The official package
-    "agent-framework-azure-ai",
-    
+    # AgentFramework SDK. agent-framework-azure-ai is still RC at 1.0.0rc6 but
+    # pulls in agent-framework-core 1.8.x where ChatAgent was renamed to Agent.
+    # The Azure OpenAI client lives in agent-framework-openai as
+    # OpenAIChatClient(azure_endpoint=...) (AzureOpenAIChatClient was removed).
+    "agent-framework-azure-ai>=1.0.0rc6",
+
     # Azure AI Projects - explicitly require pre-release version
     "azure-ai-agents>=1.2.0b5",
     "azure-ai-projects>=2.0.0b2",
@@ -41,7 +44,7 @@ dependencies = [
 
     # Microsoft Agent 365 SDK packages
     "microsoft_agents_a365_tooling >= 0.1.0",
-    "microsoft_agents_a365_tooling_extensions_agentframework >= 0.1.0",
+    "microsoft_agents_a365_tooling_extensions_agentframework >= 1.0.0",
     "microsoft_agents_a365_observability_core >= 0.1.0",
     "microsoft-opentelemetry >= 0.1.0a3",
     "microsoft_agents_a365_runtime >= 0.1.0",

@@ -70,9 +70,20 @@ param agentic365Scope string = 'ea9ffc3e-8a23-4a7d-836d-234d7c7565c1/.default'
 param graphScope string = 'https://graph.microsoft.com/.default'
 
 // ----- Naming --------------------------------------------------------------
-// Short deterministic suffix so resource names stay unique across
-// redeploys (Container Registry names must be globally unique, etc.).
+// Resource names embed both the environment/agent name (`envToken`) for
+// human readability and a deterministic hash (`resourceToken`) for global
+// uniqueness across redeploys and tenants.
+//
+// `envToken`      — lowercase, alphanumeric only (hyphens/underscores
+//                   stripped so ACR is happy), capped at 12 chars to leave
+//                   room for the 13-char hash inside the strictest length
+//                   limit (Container App / ACA env = 32 chars).
+// `resourceToken` — 13-char `uniqueString` hash; survives moves across
+//                   resource groups and keeps ACR's globally-unique
+//                   constraint satisfied.
 
+var envSanitized = toLower(replace(replace(replace(environmentName, '-', ''), '_', ''), ' ', ''))
+var envToken = take(envSanitized, 12)
 var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().id, environmentName))
 var tags = {
   'azd-env-name': environmentName
@@ -81,7 +92,7 @@ var tags = {
 // ----- Log Analytics + Container Apps environment --------------------------
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
-  name: 'log-${resourceToken}'
+  name: 'log-${envToken}-${resourceToken}'
   location: location
   tags: tags
   properties: {
@@ -91,7 +102,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
 }
 
 resource containerAppsEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
-  name: 'cae-${resourceToken}'
+  name: 'cae-${envToken}-${resourceToken}'
   location: location
   tags: tags
   properties: {
@@ -108,7 +119,7 @@ resource containerAppsEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
 // ----- Container Registry --------------------------------------------------
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
-  name: 'acr${resourceToken}'
+  name: 'acr${envToken}${resourceToken}'
   location: location
   tags: tags
   sku: { name: 'Basic' }
@@ -171,7 +182,7 @@ var authSecrets = authEnabled ? [
 ] : []
 
 resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
-  name: 'ca-agent-${resourceToken}'
+  name: 'ca-${envToken}-${resourceToken}'
   location: location
   tags: union(tags, {
     // Marks this Container App as the deploy target for the 'agent' service

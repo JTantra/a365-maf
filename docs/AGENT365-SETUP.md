@@ -16,7 +16,7 @@ These are a quick list of tools that will be used in this README. The step-by-st
 | Tool | Why it's needed | Used in | Install |
 |---|---|---|---|
 | **.NET 8 runtime** | Required by the `a365` global tool (it's a `net8.0` package). A newer SDK alone is *not* enough — `dotnet --list-runtimes` must include `Microsoft.NETCore.App 8.0.x`. | All paths | <https://dotnet.microsoft.com/download/dotnet/8.0> |
-| **Agent 365 CLI (`a365`)** | Provisions the blueprint, registers the messaging endpoint, prints the blueprint client secret, etc. | All paths | `dotnet tool install --global Microsoft.Agents.A365.DevTools.Cli --prerelease` |
+| **Agent 365 CLI (`a365`)** | Provisions the blueprint, registers the messaging endpoint, prints the blueprint client secret, etc. | All paths | `dotnet tool install --global Microsoft.Agents.A365.DevTools.Cli --version 1.1.214` |
 | **Azure CLI (`az`)** | Cached login the `a365` CLI reuses; also used for direct resource inspection (`az containerapp logs`, `az role assignment`, etc.). | All paths | <https://learn.microsoft.com/cli/azure/install-azure-cli> |
 | **Python 3.11+** + **`uv`** | Runs the agent locally; `uv` resolves and locks the SDK dependency graph. | All paths | Python: <https://www.python.org/downloads/>. `uv`: `pip install uv` or <https://docs.astral.sh/uv/getting-started/installation/> |
 | **PowerShell 7+** | Needed for the `New-Agent365ToolsServicePrincipalProdPublic.ps1` script and assorted blueprint admin-consent fallbacks the CLI prints. | All paths (tenant setup) | <https://github.com/PowerShell/PowerShell> |
@@ -58,20 +58,20 @@ The full reference is at <https://learn.microsoft.com/microsoft-agent-365/develo
 | Command | Purpose |
 |---|---|
 | `a365 --version` / `a365 -h` | Sanity check / browse the command tree. |
-| `a365 setup requirements --agent-name <name>` | Validate everything (CLI, Azure login, Entra app, permissions, redirect URIs, optional claims) and offer to auto-fix what it can. Safe to re-run. |
+| `a365 setup requirements` | Validate everything (CLI, Azure login, Entra app, permissions, redirect URIs, optional claims) and print resolution guidance for anything missing. Safe to re-run. *(v1.1.214: this command no longer takes `--agent-name`; scope a single check with `--category <Azure\|Authentication\|PowerShell\|Tenant Enrollment>`.)* |
 | `a365 setup all --agent-name <name> --dry-run` | Preview the full setup without making changes. |
 | `a365 setup all --agent-name <name>` | Provision Azure infra + blueprint + permissions + endpoint. Idempotent — reuses existing resources by name. |
 | `a365 setup all --aiteammate --agent-name <name>` | Same as above but for the AI Teammate path (richer infra + observability). |
 | `a365 setup blueprint --agent-name <name> --update-endpoint <url>` | Change just the messaging endpoint (e.g. dev tunnel URL rotated). |
 | `a365 setup blueprint --agent-name <name> --show-secret` | Print the blueprint's client secret (Windows, same machine/user that ran setup). |
-| `a365 setup permissions mcp --agent-name <name>` | Re-grant MCP server OAuth2 grants on the existing blueprint. Also `permissions bot` / `permissions custom` / `permissions copilotstudio`. |
+| `a365 setup permissions mcp --agent-name <name>` | Re-grant MCP server OAuth2 grants on the existing blueprint. Also `permissions bot` / `permissions custom` / `permissions copilotstudio`. *(v1.1.214: add `--remove-legacy-scopes` to drop the shared `ea9ffc3e-…` audience scopes once the agent is confirmed on the V2 SDK — see Step 2f.)* |
 | `a365 develop list-available` | List built-in MCP servers in the tenant catalog (what you can install). |
 | `a365 develop list-configured` | List MCP servers currently wired into this agent (reads `ToolingManifest.json`). |
 | `a365 develop add-mcp-servers <name> [<name>...]` | Add one or more built-in MCP servers to the agent (updates `ToolingManifest.json`). |
 | `a365 develop remove-mcp-servers <name> [<name>...]` | Remove built-in MCP servers from the agent. |
 | `a365 publish` | Inject IDs into `manifest/manifest.json`, package it, register with the tenant catalog. |
-| `a365 setup blueprint --agent-name <name> --endpoint-only --messaging-endpoint <url>` | Register the URL of your deployed host with an existing blueprint. Run this **after** you ship the code to Container Apps / Web App / dev tunnel / etc. |
-| `a365 query-entra ...` | Inspect scopes, permissions, and consent status of any Entra app/SP in the tenant. |
+| `a365 setup blueprint --agent-name <name> --endpoint-only --messaging-endpoint <url>` | Register the URL of your deployed host with an existing blueprint. Run this **after** you ship the code to Container Apps / Web App / dev tunnel / etc. *(v1.1.214: `--endpoint-only` and `--update-endpoint` already use the M365 / Teams Graph path automatically. To register an endpoint as part of a full `setup all`, that run now needs the `--m365` flag.)* |
+| `a365 query-entra blueprint-scopes` / `instance-scopes` / `inheritance` | Inspect scopes, permissions, and consent status. *(v1.1.214: `query-entra` now requires one of these subcommands — `blueprint-scopes` lists grants on the blueprint SP, `instance-scopes` shows the instance's scopes/consent, `inheritance` verifies the blueprint's `inheritablePermissions`.)* |
 | `a365 logs` | Manage CLI diagnostic logs (`%APPDATA%/a365/logs/` on Windows, `~/.config/a365/logs/` on Linux/macOS). Add `-v` / `--verbose` to any command for live verbose output. |
 | `a365 cleanup azure` / `a365 cleanup blueprint` | **Destructive.** Removes provisioned Azure resources or the Entra blueprint. Use only as a last resort — prefer re-running `setup all`, which is idempotent. |
 
@@ -165,21 +165,30 @@ fails with the misleading error
    > `-o Dpkg::Options::="--force-overwrite"` to the install command.
    > The `dotnet-install.sh` route above avoids the conflict entirely.
 
-3. **Install (or update) the Agent 365 CLI**:
+3. **Install (or update) the Agent 365 CLI** — pin to **`1.1.214`**, the
+   version this guide is validated against:
 
    ```bash
-   # First time
-   dotnet tool install --global Microsoft.Agents.A365.DevTools.Cli --prerelease
+   # First time (pinned)
+   dotnet tool install --global Microsoft.Agents.A365.DevTools.Cli --version 1.1.214
 
-   # Or, if already installed
-   dotnet tool update --global Microsoft.Agents.A365.DevTools.Cli --prerelease
+   # Or, if already installed, move it to the pinned version
+   dotnet tool update --global Microsoft.Agents.A365.DevTools.Cli --version 1.1.214
    ```
 
-3. **Verify it's on your PATH:**
+   > **Why pin?** The `a365` CLI is moving fast and command surfaces change
+   > between releases (for example, `setup requirements` dropped `--agent-name`,
+   > and `query-entra` now requires a subcommand). Pinning `--version 1.1.214`
+   > keeps the commands in this guide working as written. To intentionally move
+   > to the latest preview later, run
+   > `dotnet tool update --global Microsoft.Agents.A365.DevTools.Cli --prerelease`
+   > and re-validate against any newer command changes.
+
+4. **Verify it's on your PATH and on the pinned version:**
 
    ```bash
    a365 -h
-   a365 --version
+   a365 --version   # should print 1.1.214+<build>
    ```
 
    If `a365` is not found, ensure your tools directory is on `PATH`:
@@ -316,30 +325,30 @@ Scope IDs above (in order): `User.Read`, `Application.ReadWrite.All`,
 
 > The script above does **not** add the `AgentRegistration.ReadWrite.All`
 > permission (it's exposed by the Agent 365 service API, not Microsoft Graph)
-> or the `wids` optional claim. Either add those in the portal per Option A,
-> or let `a365 setup requirements` apply them — see below.
+> or the `wids` optional claim. Add those in the portal per Option A, or run
+> `a365 setup requirements` to confirm what's still missing — see below.
 
-##### Validate (and let the CLI patch what it can)
+##### Validate
 
 Rather than tracking every required permission, URI, and claim by hand, ask
 the CLI itself. From your project directory:
 
 ```bash
-a365 setup requirements --agent-name <your-agent-base-name>
+a365 setup requirements
 ```
+
+> **v1.1.214:** `setup requirements` no longer accepts `--agent-name`. Run it
+> bare, or scope a single category with
+> `a365 setup requirements --category <Azure|Authentication|PowerShell|Tenant Enrollment>`.
 
 The `requirements` subcommand:
 
 - Validates Azure CLI login, Entra roles, the `Agent 365 CLI` app registration, permissions, redirect URIs, and the `wids` optional claim.
-- For anything it can fix itself (permission grants, redirect URIs, optional claims), prints a summary like *"The following changes will be applied to app registration (<id>): ..."* and asks for confirmation before applying.
-- For anything that needs a privileged action it can't take on your behalf (e.g. role assignments, admin consent it doesn't have rights to grant), prints exactly what to do or what PowerShell to run.
+- Continues through every check even if some fail, then prints a per-category **pass / warn / fail** summary.
+- For anything missing, prints detailed resolution guidance (and the PowerShell to run for privileged actions such as role assignments or admin consent).
 
-Reply `yes` when prompted to let it apply changes. After it completes
-successfully, re-run `a365 setup all ...` from Step 4.
-
-> The same auto-apply behavior runs inside `a365 setup all`, so you can also
-> skip `requirements` and go straight to Step 4 — the CLI will still surface
-> the same prompt. `requirements` is just the quicker validation loop.
+Apply any flagged fixes (in the portal per Option A, or by re-running
+`a365 setup all ...` from Step 4, which performs the privileged steps it can).
 
 ##### Verify
 
@@ -385,7 +394,7 @@ Then create and activate the venv exactly as in
 #### 2e. Select built-in MCP tools (optional)
 
 This template ships with one MCP server wired up in
-[ToolingManifest.json](../ToolingManifest.json). If that's
+[ToolingManifest.json](../ToolingManifest.json) — `mcp_MailTools`. If that's
 all you need, **skip this step**. Otherwise pick the built-in MCP servers you
 want the agent to call (Mail, SharePoint, Word, Excel, PowerPoint, etc.)
 **before** running `a365 setup all`, because the CLI reads
@@ -429,6 +438,33 @@ blueprint.
 > `McpToolRegistrationService` picks up the new servers on the next turn.
 
 #### 2f. Use the canonical `McpServers.*.All` scopes (Word, OneDrive, Excel, Teams, etc.)
+
+> ⚠️ **Changed in CLI v1.1.214 — the audience model is in transition (V1 → V2).**
+> `a365 develop list-available` now returns a **mix** of two audience styles,
+> and `a365 develop list-configured` tags each configured server `V1` or `V2`:
+>
+> - **V1 (shared audience):** scope `McpServers.<Workload>.All` on the
+>   canonical **Agent 365 Tools** app `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1`.
+>   This is the path the rest of this section documents and it still works.
+> - **V2 (per-server audience):** scope `Tools.ListInvoke.All` on a
+>   **dedicated per-server app** (e.g. `mcp_MailTools` →
+>   `16b1878d-…`, `mcp_WordServer` → `c2d0c2b6-…`,
+>   `mcp_TeamsServer` → `ce5029ee-…`). In v1.1.214 these are **first-class**:
+>   `a365 setup all` / `setup permissions mcp` detect any per-server SP that's
+>   missing from your tenant and offer to create it inline
+>   (`az ad sp create --id <appId>`). Pass `--skip-sp-provisioning` to opt out
+>   (implicitly on when stdin is redirected, e.g. CI / coding-agent).
+>
+> Because the SDK is mid-migration, a blueprint can legitimately hold **both**
+> the shared `ea9ffc3e-…` scopes (for V1 SDK builds) and the per-server V2
+> scopes at once. Once your agent is confirmed running the **V2 SDK**, retire
+> the shared scopes with `a365 setup permissions mcp --remove-legacy-scopes`
+> (do **not** run it while still on V1 — agents on V1 lose tool access).
+>
+> The guidance below (force everything onto the `ea9ffc3e-…` audience) remains
+> the **safest single-audience choice for V1 SDK agents**. If your project is
+> on the V2 SDK, prefer the per-server audiences shown by `list-available` and
+> let `setup permissions mcp` provision their SPs instead of hand-editing.
 
 The `a365 develop list-available` catalog shows several "Work IQ" servers
 (e.g. `mcp_WordServer`, `mcp_OneDriveRemoteServer`) listed against
@@ -492,13 +528,18 @@ Finally **restart the agent process** — MCP servers are discovered on first
 request after startup, so a running server won't pick up newly-granted
 scopes until restart.
 
-> ⚠️ **Don't confuse the two audiences.** If you ever see
-> `c2d0c2b6-...` (Work IQ Word MCP), `b0b2a2bb-...` (Work IQ OneDrive), or
-> any audience other than `ea9ffc3e-...` in your blueprint's
-> `requiredResourceAccess`, the agent instance won't be able to mint a
-> token. Remove those entries via the Entra portal or
-> `az ad app update --required-resource-accesses` and stick to the
-> canonical Tools resource.
+> ⚠️ **V1 vs V2 audiences (updated for CLI v1.1.214).** A blueprint can now
+> legitimately hold **both** the shared `ea9ffc3e-…` (`McpServers.*.All`)
+> scopes **and** the per-server V2 audiences (e.g. `c2d0c2b6-…` Word,
+> `ce5029ee-…` Teams, `16b1878d-…` Mail, `ab7c82de-…` Copilot) with
+> `Tools.ListInvoke.All` — that's expected during the SDK migration, and
+> `a365 query-entra blueprint-scopes` will show them side by side. **Do not
+> blanket-delete the V2 audiences anymore** — V2 SDK agents need them. Only
+> remove a per-server audience if your agent is still on the **V1 SDK** and
+> failing to mint a token for that workload; otherwise prefer
+> `a365 setup permissions mcp --remove-legacy-scopes` (after confirming V2) to
+> retire the shared `ea9ffc3e-…` scopes. Use `query-entra inheritance` to
+> confirm instances will inherit whatever grants you keep.
 
 ### Step 3 — Configure AI Teammate
 From the **root of this repository**:
@@ -521,12 +562,6 @@ project type (Python is detected by `pyproject.toml` in this repo).
 
 #### 4a. Dry-run first (always)
 
-**Standard path:**
-
-```bash
-a365 setup all --agent-name <your-agent-base-name> --dry-run
-```
-
 **AI Teammate path:**
 
 ```bash
@@ -537,28 +572,33 @@ Review the resources the CLI proposes to create.
 
 #### 4b. Apply
 
-**Standard path:**
-
-```bash
-a365 setup all --agent-name <your-agent-base-name>
-```
-
 **AI Teammate path:**
 
 ```bash
 a365 setup all
 ```
 
-This single command will:
+This single command will (the exact step list is printed by `--dry-run`):
 
-- Create / validate the Azure infrastructure (Resource Group, App Service Plan, Web App, Managed Identity).
-- Create the Agent 365 **Blueprint** in Microsoft Entra ID.
-- Configure blueprint permissions.
-- Register the messaging endpoint.
+- Validate prerequisites (Azure CLI, PowerShell modules).
+- Create the Agent 365 **Blueprint** in Microsoft Entra ID, plus its service principal, client secret, federated identity credential (FIC), and managed identity.
+- Configure **inheritable permissions** and attempt the blueprint **permission grants** (Global Administrator needed for tenant-wide consent — a consent URL / PowerShell snippet is printed if you lack it).
+- For the AI Teammate path, also create the **agent identity** and **agent registration**.
+- Write project settings to `appsettings.json`.
+
+> **v1.1.214 — `setup all` no longer provisions Azure hosting or the endpoint
+> inline.** The AI Teammate path reports *"Azure hosting — skip: hosting is
+> externally managed"*, and the messaging endpoint is **deferred** (AI Teammate)
+> or **skipped — non-M365 agent** (blueprint-only). You deploy the code
+> yourself (Step 5c) and then register the URL with
+> `a365 setup blueprint --endpoint-only --messaging-endpoint <url>` (add
+> `--m365`, or run `setup all --m365`, if you want the endpoint registered as
+> part of setup). This matches the "no `a365 deploy`" note above.
 
 The command may take several minutes. Watch the output — the CLI emits
-`[1/5]`, `[2/5]`-style progress markers. If a sign-in dialog (WAM on Windows,
-browser tab elsewhere) appears, complete it; the CLI resumes automatically.
+numbered `1.`, `2.` … step markers (8 steps for the blueprint-only path, 7 for
+AI Teammate). If a sign-in dialog (WAM on Windows, browser tab elsewhere)
+appears, complete it; the CLI resumes automatically.
 
 After it finishes, copy the **Setup Summary** table from the output. If a
 **Permission Grants** action item is printed, run the PowerShell script the
@@ -693,9 +733,9 @@ into agentic mode (sets `AUTH_HANDLER_NAME=AGENTIC`, the `CONNECTIONS__*` and
 secret referenced via `secretRef:`).
 
 ```bash
-# Read the IDs the Agent 365 CLI wrote to a365.generated.config.json.
+# blueprint (client) ID is in the generated config; tenantId lives in a365.config.json.
 CLIENT_ID=$(jq -r '.agentBlueprintId' a365.generated.config.json)
-TENANT_ID=$(jq -r '.tenantId'        a365.generated.config.json)
+TENANT_ID=$(jq -r '.tenantId'         a365.config.json)
 
 azd env set BLUEPRINT_CLIENT_ID  "$CLIENT_ID"
 azd env set BLUEPRINT_TENANT_ID  "$TENANT_ID"
@@ -959,11 +999,11 @@ flow from Step 2e.
 | `Forbidden` / `Authorization_RequestDenied` during blueprint creation | Missing directory role or admin consent — revisit Step 2b. |
 | `App "Agent 365 CLI" was not found in tenant <id>` | The tenant client app isn't registered — follow Step 2c. |
 | `AADSTS50011: The redirect URI 'ms-appx-web://Microsoft.AAD.BrokerPlugin/<id>' ... does not match` | The `Agent 365 CLI` app is missing the WAM broker redirect URI. In **Authentication**, add `ms-appx-web://Microsoft.AAD.BrokerPlugin/<this-app's-client-id>` (and `https://login.microsoftonline.com/common/oauth2/nativeclient` while you're there). See Step 2c. |
-| CLI reports missing `AgentRegistration.ReadWrite.All`, `http://localhost:8400/`, or `wids` claim | Re-run `a365 setup requirements --agent-name <name>` and accept the proposed changes, or apply them manually per Step 2c Option A (steps 4 and 6). |
+| CLI reports missing `AgentRegistration.ReadWrite.All`, `http://localhost:8400/`, or `wids` claim | Re-run `a365 setup requirements` (v1.1.214: no `--agent-name`) to confirm the gap, then apply it in the portal per Step 2c Option A (steps 4 and 6) or by re-running `a365 setup all`. |
 | `Operation cannot be completed without additional quota` | Azure region/SKU quota hit — pick a different region and retry. |
 | Publish fails reaching admin center | Custom client app missing `Application.ReadWrite.All`; have an admin grant it. |
-| Agent reply says "I don't have access to Word/OneDrive/SharePoint" even though the server is in `ToolingManifest.json` | The manifest entry likely uses a "Work IQ" audience (`c2d0c2b6-...`, `b0b2a2bb-...`, etc.) — those don't propagate to the agent instance. Replace the entry to use the canonical `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` audience with the corresponding `McpServers.<Workload>.All` scope (see Step 2f), then re-run `a365 setup permissions mcp --agent-name <name>` and restart the agent. |
-| Agent server crashes every activity with `AADSTS65001 ... has not consented to use the application '<agent-instance-id>'` and `Failed to obtain token for agentic activity` right after adding a new MCP scope | The blueprint's `requiredResourceAccess` references a resource the agent instance can't get an inheritable grant for — usually a "Work IQ" audience added via `a365 setup permissions custom`. Remove the offending entry from the blueprint app (Entra portal → API permissions, or `az ad app update`), then re-run `a365 setup permissions mcp --agent-name <name>` (which uses the canonical `ea9ffc3e-...` audience) and restart. |
+| Agent reply says "I don't have access to Word/OneDrive/SharePoint" even though the server is in `ToolingManifest.json` | First confirm which SDK the agent runs. **V1 SDK:** the per-server "Work IQ" audience (`c2d0c2b6-…` Word, `b0b2a2bb-…` OneDrive, etc.) won't propagate — switch that manifest entry to the canonical `ea9ffc3e-8a23-4a7d-836d-234d7c7565c1` audience with the matching `McpServers.<Workload>.All` scope (Step 2f), re-run `a365 setup permissions mcp --agent-name <name>`, and restart. **V2 SDK:** the per-server audience *is* correct — instead run `a365 query-entra inheritance` to confirm the grant is inheritable, re-run `setup permissions mcp`, and restart. |
+| Agent server crashes every activity with `AADSTS65001 ... has not consented to use the application '<agent-instance-id>'` and `Failed to obtain token for agentic activity` right after adding a new MCP scope | The blueprint references a resource the agent instance can't get an inheritable grant for. Run `a365 query-entra inheritance` to see which resource isn't inheritable. On the **V1 SDK**, switch that workload to the canonical `ea9ffc3e-…` audience (`McpServers.<Workload>.All`) and re-run `a365 setup permissions mcp --agent-name <name>`; on the **V2 SDK**, make sure the per-server audience's SP exists in your tenant (`setup all` / `setup permissions mcp` provision it unless `--skip-sp-provisioning` was used) and re-run, then restart. |
 | `a365 setup permissions custom` prints `OAuth2 permission grant failed (non-transient) ... Authorization_RequestDenied` even on a "Work IQ" audience as a Global Administrator | This usually means the resource doesn't support delegated tenant-wide consent through the CLI's path. Prefer the canonical `McpServers.*.All` scopes on the Agent 365 Tools resource (Step 2f) — they always work. |
 | Need detailed logs | Re-run with `-v` / `--verbose`. Logs live at `%APPDATA%/a365/logs/` (Windows) or `~/.config/a365/logs/` (Linux/macOS). |
 

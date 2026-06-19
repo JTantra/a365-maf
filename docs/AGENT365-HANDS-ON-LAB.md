@@ -17,11 +17,12 @@ By the end of this lab, you will have:
 * Enabled agentic authentication so Teams messages are accepted by the backend.
 * Verified the live endpoint and checked logs for incoming Teams activity.
 
-The lab assumes you are using the repository from inside the VS Code dev
-container. The dev container already includes the required command-line tools,
-including `az`, `azd`, `a365`, PowerShell, Python, and the project virtual
-environment. Do not spend workshop time installing tools unless a validation
-step fails.
+This lab uses the repository's VS Code Dev Container so attendees can run the
+same Linux-based toolchain without installing every CLI on their local machine.
+The Dev Container already includes the required command-line tools, including
+`az`, `azd`, `a365`, PowerShell, Python, and the project virtual environment.
+Do not spend workshop time installing tools manually unless a validation step
+fails.
 
 ## Before attendees start
 
@@ -59,9 +60,105 @@ git log --oneline --all -- 'a365.generated.config*.json'
 
 Both commands should produce no output.
 
-## Step 1: Open the dev container
+## Configuration files to review before deployment
 
-Open the repository in VS Code and select **Reopen in Container** when prompted.
+Review these files before you create or deploy a lab agent. Most lab settings
+are supplied through shell variables and `azd env set`, but these files explain
+where the values land and which files should stay local.
+
+### Agent 365 configuration
+
+`a365.config.json` is the user-managed Agent 365 configuration. Before running
+setup, confirm these values match the tenant and agent name you plan to use:
+
+* `tenantId`
+* `clientAppId`
+* `agentIdentityDisplayName`
+* `agentBlueprintDisplayName`
+* `agentDescription`
+* `aiTeammate`
+
+For this AI Teammate lab path, keep `aiTeammate` set to `true`. The display
+name values should use the same base name as `AGENT_NAME`, such as
+`$AGENT_NAME Identity` and `$AGENT_NAME Blueprint`. If you change `AGENT_NAME`,
+rerun the setup commands so the Agent 365 CLI writes fresh local state for that
+agent.
+
+`a365.generated.config.json` is CLI-managed generated state. It can contain
+resource IDs and the blueprint client secret. Do not edit it by hand and do not
+commit it. The lab only reads this file after `a365 setup all` succeeds.
+
+### Manifest files
+
+`manifest/manifest.json` is the tenant catalog package metadata. Review and
+update the attendee-facing values in Step 6 before publishing the package.
+Common fields include `name`, `description`, `developer`, and `version`.
+
+`manifest/agenticUserTemplateManifest.json` is used with the manifest package
+for the agentic user template. The CLI can stamp blueprint-related IDs into the
+manifest files, so review the generated values after setup and before upload.
+
+### Azure deployment configuration
+
+`azure.yaml` defines the `azd` application, the Python Container Apps service,
+the Docker build settings, and the post-deploy reminder to register the public
+`/api/messages` endpoint. Leave this file unchanged for the standard lab unless
+you intentionally change the deployment shape, Dockerfile path, or build mode.
+
+`infra/main.parameters.json` maps `azd` environment values into the Bicep
+deployment. For the lab, prefer `azd env set` instead of editing this file.
+The key values set later are `AZURE_LOCATION`, `AZURE_SUBSCRIPTION_ID`,
+`AZURE_RESOURCE_GROUP`, the `AZURE_OPENAI_*` values, and the `BLUEPRINT_*`
+values used for agentic authentication.
+
+`infra/main.bicep` and `infra/resources.bicep` define the Azure resources,
+including Azure Container Apps, Azure Container Registry, Log Analytics, managed
+identity, and runtime environment variables. Leave these files unchanged unless
+the facilitator asks you to alter the infrastructure design.
+
+`.azure/<environment>/.env` is local `azd` environment state created by
+`azd env new` and `azd env set`. It stores deployment settings and later stores
+the blueprint client secret value. Keep `.azure/` ignored by Git.
+
+### Local Playground configuration
+
+`m365agents.playground.yml` and `env/.env.playground.user` are for the
+Microsoft 365 Agents Playground path. They are useful for local testing, but the
+Azure Container Apps deployment in this lab uses `azd` and the `azure.yaml` /
+`infra/` path instead.
+
+## Step 1: Open the repo in the VS Code Dev Container
+
+The repository includes a Dev Container configuration in
+`.devcontainer/devcontainer.json`. VS Code uses this file to build and connect
+to a container with a well-defined runtime and tool stack for the lab.
+
+Before opening the container, confirm these local prerequisites:
+
+* [Visual Studio Code](https://code.visualstudio.com/) is installed.
+* [Docker Desktop](https://www.docker.com/products/docker-desktop) or another
+  Docker-compatible runtime is installed and running.
+* [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+  is installed in VS Code.
+
+For a visual walkthrough, see the referenced
+[VS Code Dev Containers video](https://youtu.be/X7guekGZM20?si=AjYbU_IAqK325oWE&t=83).
+For deeper reference, see the official VS Code guide:
+[Developing inside a container](https://code.visualstudio.com/docs/devcontainers/containers).
+
+Open the repository in the Dev Container:
+
+1. Start Docker and wait until it is running.
+2. Open this repository folder in VS Code.
+3. If VS Code prompts you to reopen the folder in a container, select
+   **Reopen in Container**.
+4. If no prompt appears, open the Command Palette with `F1` or `Ctrl+Shift+P`,
+   then run **Dev Containers: Reopen in Container**.
+5. Wait for the container build and `postCreateCommand` bootstrap to finish.
+   The first build can take several minutes because it installs and configures
+   SDKs, CLIs, PowerShell modules, and Python dependencies.
+6. Open a new VS Code terminal. It should now run inside the container.
+
 After the terminal opens, start from the repository root:
 
 ```bash
@@ -80,6 +177,31 @@ pwsh --version
 
 If these commands work, skip all installation instructions from the longer setup
 guide.
+
+If an expected tool is missing after the container starts, reload the terminal
+profile:
+
+```bash
+source ~/.bashrc
+```
+
+If the tool is still missing, rerun the Dev Container bootstrap:
+
+```bash
+bash .devcontainer/setup-tools.sh
+```
+
+If the container still does not behave as expected, rebuild it from VS Code:
+
+```text
+Dev Containers: Rebuild Container Without Cache
+```
+
+> [!NOTE]
+> VS Code Dev Containers can reuse local Git credentials inside the container.
+> HTTPS credentials from a local credential helper are usually reused
+> automatically. SSH-based Git workflows may require your local SSH agent to be
+> running before you reopen the repo in the container.
 
 ## Step 2: Set lab variables
 

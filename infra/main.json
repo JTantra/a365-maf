@@ -1,0 +1,634 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.44.1.10279",
+      "templateHash": "9601020102442347548"
+    }
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "metadata": {
+        "description": "Environment name (azd env). Used as the new resource group name suffix and a resource-name token."
+      }
+    },
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Azure region for the new resource group and all workload resources."
+      }
+    },
+    "resourceGroupName": {
+      "type": "string",
+      "defaultValue": "[format('rg-{0}', parameters('environmentName'))]",
+      "metadata": {
+        "description": "Name of the resource group to create for the workload."
+      }
+    },
+    "azureOpenAiAccountName": {
+      "type": "string",
+      "defaultValue": "terenceaifoundry-resource",
+      "metadata": {
+        "description": "Existing Azure OpenAI / Foundry account name to grant the agent MI access to."
+      }
+    },
+    "azureOpenAiSubscriptionId": {
+      "type": "string",
+      "defaultValue": "[subscription().subscriptionId]",
+      "metadata": {
+        "description": "Subscription ID containing the existing Azure OpenAI / Foundry account. Defaults to the deployment subscription."
+      }
+    },
+    "azureOpenAiResourceGroup": {
+      "type": "string",
+      "defaultValue": "rg-admin-terenceaifoundry",
+      "metadata": {
+        "description": "Resource group containing the existing AOAI / Foundry account. The role assignment is created here."
+      }
+    },
+    "azureOpenAiEndpoint": {
+      "type": "string",
+      "defaultValue": "https://terenceaifoundry-resource.openai.azure.com",
+      "metadata": {
+        "description": "Public endpoint of the AOAI / Foundry account. Use the **resource root** (no trailing `/openai/v1`) — `OpenAIChatClient(azure_endpoint=...)` appends `/openai/v1/responses` itself, so a `.../openai/v1` value produces a doubled path that 404s."
+      }
+    },
+    "azureOpenAiDeployment": {
+      "type": "string",
+      "defaultValue": "gpt-5.4",
+      "metadata": {
+        "description": "Model deployment name on the AOAI / Foundry account."
+      }
+    },
+    "azureOpenAiApiVersion": {
+      "type": "string",
+      "defaultValue": "preview",
+      "metadata": {
+        "description": "Azure OpenAI API version the chat client will use. The `/openai/v1/responses` endpoint on some Foundry accounts only accepts the rolling `preview` literal; datestamped previews (e.g. `2025-04-01-preview`) return `API version not supported`."
+      }
+    },
+    "containerCpu": {
+      "type": "string",
+      "defaultValue": "0.5",
+      "metadata": {
+        "description": "Container CPU (cores). 0.5 is the smallest sane size for Python aiohttp."
+      }
+    },
+    "containerMemory": {
+      "type": "string",
+      "defaultValue": "1.0Gi",
+      "metadata": {
+        "description": "Container memory."
+      }
+    },
+    "minReplicas": {
+      "type": "int",
+      "defaultValue": 1,
+      "minValue": 1,
+      "metadata": {
+        "description": "Min replicas for autoscale. Must be >= 1 — the agent keeps in-memory per-channel sessions, so scaling to zero would drop conversation history on cold start."
+      }
+    },
+    "maxReplicas": {
+      "type": "int",
+      "defaultValue": 3,
+      "minValue": 1,
+      "metadata": {
+        "description": "Max replicas for autoscale."
+      }
+    },
+    "blueprintClientId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Blueprint app (client) ID from a365.generated.config.json. Leave empty for anonymous mode."
+      }
+    },
+    "blueprintTenantId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Tenant ID for the blueprint app. Defaults to the deployment subscription tenant."
+      }
+    },
+    "blueprintClientSecret": {
+      "type": "securestring",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Blueprint client secret. Print with `a365 setup blueprint --agent-name <name> --show-secret`."
+      }
+    },
+    "initialImage": {
+      "type": "string",
+      "defaultValue": "mcr.microsoft.com/dotnet/samples:aspnetapp",
+      "metadata": {
+        "description": "Initial container image reference for the first provision. Must listen on the Container App ingress target port before azd deploy replaces it with the real image."
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/resourceGroups",
+      "apiVersion": "2024-03-01",
+      "name": "[parameters('resourceGroupName')]",
+      "location": "[parameters('location')]",
+      "tags": {
+        "azd-env-name": "[parameters('environmentName')]"
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "workload",
+      "resourceGroup": "[parameters('resourceGroupName')]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "environmentName": {
+            "value": "[parameters('environmentName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "azureOpenAiAccountName": {
+            "value": "[parameters('azureOpenAiAccountName')]"
+          },
+          "azureOpenAiSubscriptionId": {
+            "value": "[parameters('azureOpenAiSubscriptionId')]"
+          },
+          "azureOpenAiResourceGroup": {
+            "value": "[parameters('azureOpenAiResourceGroup')]"
+          },
+          "azureOpenAiEndpoint": {
+            "value": "[parameters('azureOpenAiEndpoint')]"
+          },
+          "azureOpenAiDeployment": {
+            "value": "[parameters('azureOpenAiDeployment')]"
+          },
+          "azureOpenAiApiVersion": {
+            "value": "[parameters('azureOpenAiApiVersion')]"
+          },
+          "containerCpu": {
+            "value": "[parameters('containerCpu')]"
+          },
+          "containerMemory": {
+            "value": "[parameters('containerMemory')]"
+          },
+          "minReplicas": {
+            "value": "[parameters('minReplicas')]"
+          },
+          "maxReplicas": {
+            "value": "[parameters('maxReplicas')]"
+          },
+          "blueprintClientId": {
+            "value": "[parameters('blueprintClientId')]"
+          },
+          "blueprintTenantId": {
+            "value": "[parameters('blueprintTenantId')]"
+          },
+          "blueprintClientSecret": {
+            "value": "[parameters('blueprintClientSecret')]"
+          },
+          "initialImage": {
+            "value": "[parameters('initialImage')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.44.1.10279",
+              "templateHash": "9114748280851393620"
+            }
+          },
+          "parameters": {
+            "environmentName": {
+              "type": "string",
+              "metadata": {
+                "description": "Environment name (azd env). Used as a resource-name suffix."
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for all resources."
+              }
+            },
+            "azureOpenAiAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Existing Azure OpenAI / Foundry account name to grant the MI access to."
+              }
+            },
+            "azureOpenAiSubscriptionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Subscription ID containing the existing AOAI / Foundry account."
+              }
+            },
+            "azureOpenAiResourceGroup": {
+              "type": "string",
+              "metadata": {
+                "description": "Resource group containing the existing AOAI / Foundry account."
+              }
+            },
+            "azureOpenAiEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Public endpoint of the AOAI / Foundry account."
+              }
+            },
+            "azureOpenAiDeployment": {
+              "type": "string",
+              "metadata": {
+                "description": "Model deployment name on the AOAI / Foundry account."
+              }
+            },
+            "azureOpenAiApiVersion": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI API version the chat client will use."
+              }
+            },
+            "containerCpu": {
+              "type": "string",
+              "metadata": {
+                "description": "Container CPU (cores)."
+              }
+            },
+            "containerMemory": {
+              "type": "string",
+              "metadata": {
+                "description": "Container memory."
+              }
+            },
+            "minReplicas": {
+              "type": "int",
+              "minValue": 1,
+              "metadata": {
+                "description": "Min replicas for autoscale. Must be >= 1 — the agent keeps in-memory per-channel sessions, so scaling to zero would drop conversation history on cold start."
+              }
+            },
+            "maxReplicas": {
+              "type": "int",
+              "minValue": 1,
+              "metadata": {
+                "description": "Max replicas for autoscale."
+              }
+            },
+            "blueprintClientId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Blueprint app (client) ID from a365.generated.config.json. Leave empty for anonymous mode."
+              }
+            },
+            "blueprintTenantId": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Tenant ID for the blueprint app. Defaults to the deployment subscription tenant."
+              }
+            },
+            "blueprintClientSecret": {
+              "type": "securestring",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Blueprint client secret. Print with `a365 setup blueprint --agent-name <name> --show-secret`."
+              }
+            },
+            "agentic365Scope": {
+              "type": "string",
+              "defaultValue": "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1/.default",
+              "metadata": {
+                "description": "Agent 365 agentic scope. Default is the public production scope; override for sovereign clouds."
+              }
+            },
+            "graphScope": {
+              "type": "string",
+              "defaultValue": "https://graph.microsoft.com/.default",
+              "metadata": {
+                "description": "Microsoft Graph scope the SDK connection requests when acting as the blueprint identity."
+              }
+            },
+            "initialImage": {
+              "type": "string",
+              "defaultValue": "mcr.microsoft.com/dotnet/samples:aspnetapp",
+              "metadata": {
+                "description": "Initial container image reference. Must listen on the Container App ingress target port before azd deploy replaces it with the real image."
+              }
+            }
+          },
+          "variables": {
+            "resourceToken": "[toLower(uniqueString(subscription().id, resourceGroup().id, parameters('environmentName')))]",
+            "tags": {
+              "azd-env-name": "[parameters('environmentName')]"
+            },
+            "acrPullRoleId": "7f951dda-4ed3-4680-a7ca-43fe172d538d",
+            "placeholderImage": "[parameters('initialImage')]",
+            "resolvedTenantId": "[if(empty(parameters('blueprintTenantId')), subscription().tenantId, parameters('blueprintTenantId'))]",
+            "authEnabled": "[and(not(empty(parameters('blueprintClientId'))), not(empty(parameters('blueprintClientSecret'))))]",
+            "baseEnv": [
+              {
+                "name": "HOST",
+                "value": "0.0.0.0"
+              },
+              {
+                "name": "PORT",
+                "value": "3978"
+              },
+              {
+                "name": "ASPNETCORE_HTTP_PORTS",
+                "value": "3978"
+              },
+              {
+                "name": "AZURE_OPENAI_ENDPOINT",
+                "value": "[parameters('azureOpenAiEndpoint')]"
+              },
+              {
+                "name": "AZURE_OPENAI_DEPLOYMENT",
+                "value": "[parameters('azureOpenAiDeployment')]"
+              },
+              {
+                "name": "AZURE_OPENAI_API_VERSION",
+                "value": "[parameters('azureOpenAiApiVersion')]"
+              },
+              {
+                "name": "PYTHON_ENVIRONMENT",
+                "value": "Production"
+              },
+              {
+                "name": "ENABLE_A365_OBSERVABILITY_EXPORTER",
+                "value": "true"
+              }
+            ],
+            "authEnv": "[if(variables('authEnabled'), createArray(createObject('name', 'AUTH_HANDLER_NAME', 'value', 'AGENTIC'), createObject('name', 'USE_AGENTIC_AUTH', 'value', 'true'), createObject('name', 'CLIENT_ID', 'value', parameters('blueprintClientId')), createObject('name', 'TENANT_ID', 'value', variables('resolvedTenantId')), createObject('name', 'CLIENT_SECRET', 'secretRef', 'blueprint-client-secret'), createObject('name', 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID', 'value', parameters('blueprintClientId')), createObject('name', 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID', 'value', variables('resolvedTenantId')), createObject('name', 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET', 'secretRef', 'blueprint-client-secret'), createObject('name', 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__SCOPES', 'value', parameters('graphScope')), createObject('name', 'AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS__AGENTIC__SETTINGS__TYPE', 'value', 'AgenticUserAuthorization'), createObject('name', 'AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS__AGENTIC__SETTINGS__SCOPES', 'value', parameters('agentic365Scope')), createObject('name', 'AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS__AGENTIC__SETTINGS__ALTERNATEBLUEPRINTCONNECTIONNAME', 'value', 'SERVICE_CONNECTION'), createObject('name', 'CONNECTIONSMAP__0__SERVICEURL', 'value', '*'), createObject('name', 'CONNECTIONSMAP__0__CONNECTION', 'value', 'SERVICE_CONNECTION')), createArray())]",
+            "authSecrets": "[if(variables('authEnabled'), createArray(createObject('name', 'blueprint-client-secret', 'value', parameters('blueprintClientSecret'))), createArray())]",
+            "cogSvcOpenAIUserRoleId": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2023-09-01",
+              "name": "[format('log-{0}', variables('resourceToken'))]",
+              "location": "[parameters('location')]",
+              "tags": "[variables('tags')]",
+              "properties": {
+                "sku": {
+                  "name": "PerGB2018"
+                },
+                "retentionInDays": 30
+              }
+            },
+            {
+              "type": "Microsoft.App/managedEnvironments",
+              "apiVersion": "2024-03-01",
+              "name": "[format('cae-{0}', variables('resourceToken'))]",
+              "location": "[parameters('location')]",
+              "tags": "[variables('tags')]",
+              "properties": {
+                "appLogsConfiguration": {
+                  "destination": "log-analytics",
+                  "logAnalyticsConfiguration": {
+                    "customerId": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', format('log-{0}', variables('resourceToken'))), '2023-09-01').customerId]",
+                    "sharedKey": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', format('log-{0}', variables('resourceToken'))), '2023-09-01').primarySharedKey]"
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.OperationalInsights/workspaces', format('log-{0}', variables('resourceToken')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.ContainerRegistry/registries",
+              "apiVersion": "2023-11-01-preview",
+              "name": "[format('acr{0}', variables('resourceToken'))]",
+              "location": "[parameters('location')]",
+              "tags": "[variables('tags')]",
+              "sku": {
+                "name": "Basic"
+              },
+              "properties": {
+                "adminUserEnabled": false
+              }
+            },
+            {
+              "type": "Microsoft.ManagedIdentity/userAssignedIdentities",
+              "apiVersion": "2023-01-31",
+              "name": "[format('id-acrpull-{0}', variables('resourceToken'))]",
+              "location": "[parameters('location')]",
+              "tags": "[variables('tags')]"
+            },
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken')))]",
+              "name": "[guid(resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken'))), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-acrpull-{0}', variables('resourceToken'))), variables('acrPullRoleId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', variables('acrPullRoleId'))]",
+                "principalId": "[reference(resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-acrpull-{0}', variables('resourceToken'))), '2023-01-31').principalId]",
+                "principalType": "ServicePrincipal"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken')))]",
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-acrpull-{0}', variables('resourceToken')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.App/containerApps",
+              "apiVersion": "2024-03-01",
+              "name": "[format('ca-agent-{0}', variables('resourceToken'))]",
+              "location": "[parameters('location')]",
+              "tags": "[union(variables('tags'), createObject('azd-service-name', 'agent'))]",
+              "identity": {
+                "type": "SystemAssigned, UserAssigned",
+                "userAssignedIdentities": {
+                  "[format('{0}', resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-acrpull-{0}', variables('resourceToken'))))]": {}
+                }
+              },
+              "properties": {
+                "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', format('cae-{0}', variables('resourceToken')))]",
+                "configuration": {
+                  "ingress": {
+                    "external": true,
+                    "targetPort": 3978,
+                    "transport": "auto",
+                    "allowInsecure": false
+                  },
+                  "registries": [
+                    {
+                      "server": "[reference(resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken'))), '2023-11-01-preview').loginServer]",
+                      "identity": "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-acrpull-{0}', variables('resourceToken')))]"
+                    }
+                  ],
+                  "secrets": "[variables('authSecrets')]"
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "agent",
+                      "image": "[variables('placeholderImage')]",
+                      "resources": {
+                        "cpu": "[json(parameters('containerCpu'))]",
+                        "memory": "[parameters('containerMemory')]"
+                      },
+                      "env": "[concat(variables('baseEnv'), variables('authEnv'))]"
+                    }
+                  ],
+                  "scale": {
+                    "minReplicas": "[parameters('minReplicas')]",
+                    "maxReplicas": "[parameters('maxReplicas')]"
+                  }
+                }
+              },
+              "dependsOn": [
+                "[extensionResourceId(resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken'))), 'Microsoft.Authorization/roleAssignments', guid(resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken'))), resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-acrpull-{0}', variables('resourceToken'))), variables('acrPullRoleId')))]",
+                "[resourceId('Microsoft.App/managedEnvironments', format('cae-{0}', variables('resourceToken')))]",
+                "[resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken')))]",
+                "[resourceId('Microsoft.ManagedIdentity/userAssignedIdentities', format('id-acrpull-{0}', variables('resourceToken')))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Resources/deployments",
+              "apiVersion": "2025-04-01",
+              "name": "aoai-role-assignment",
+              "subscriptionId": "[parameters('azureOpenAiSubscriptionId')]",
+              "resourceGroup": "[parameters('azureOpenAiResourceGroup')]",
+              "properties": {
+                "expressionEvaluationOptions": {
+                  "scope": "inner"
+                },
+                "mode": "Incremental",
+                "parameters": {
+                  "aoaiAccountName": {
+                    "value": "[parameters('azureOpenAiAccountName')]"
+                  },
+                  "principalId": {
+                    "value": "[reference(resourceId('Microsoft.App/containerApps', format('ca-agent-{0}', variables('resourceToken'))), '2024-03-01', 'full').identity.principalId]"
+                  },
+                  "roleDefinitionId": {
+                    "value": "[variables('cogSvcOpenAIUserRoleId')]"
+                  }
+                },
+                "template": {
+                  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                  "contentVersion": "1.0.0.0",
+                  "metadata": {
+                    "_generator": {
+                      "name": "bicep",
+                      "version": "0.44.1.10279",
+                      "templateHash": "4966930917411853750"
+                    }
+                  },
+                  "parameters": {
+                    "aoaiAccountName": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Name of the existing Azure OpenAI / Foundry account in this resource group."
+                      }
+                    },
+                    "principalId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Principal ID (object ID) of the managed identity to grant the role to."
+                      }
+                    },
+                    "roleDefinitionId": {
+                      "type": "string",
+                      "metadata": {
+                        "description": "Role definition GUID (just the GUID, no subscription prefix)."
+                      }
+                    }
+                  },
+                  "resources": [
+                    {
+                      "type": "Microsoft.Authorization/roleAssignments",
+                      "apiVersion": "2022-04-01",
+                      "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('aoaiAccountName'))]",
+                      "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('aoaiAccountName')), parameters('principalId'), parameters('roleDefinitionId'))]",
+                      "properties": {
+                        "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
+                        "principalId": "[parameters('principalId')]",
+                        "principalType": "ServicePrincipal"
+                      }
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.App/containerApps', format('ca-agent-{0}', variables('resourceToken')))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "AGENT_FQDN": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.App/containerApps', format('ca-agent-{0}', variables('resourceToken'))), '2024-03-01').configuration.ingress.fqdn]"
+            },
+            "AGENT_CONTAINER_APP_NAME": {
+              "type": "string",
+              "value": "[format('ca-agent-{0}', variables('resourceToken'))]"
+            },
+            "AGENT_PRINCIPAL_ID": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.App/containerApps', format('ca-agent-{0}', variables('resourceToken'))), '2024-03-01', 'full').identity.principalId]"
+            },
+            "AGENT_AUTH_MODE": {
+              "type": "string",
+              "value": "[if(variables('authEnabled'), 'agentic', 'anonymous')]"
+            },
+            "AZURE_CONTAINER_REGISTRY_ENDPOINT": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.ContainerRegistry/registries', format('acr{0}', variables('resourceToken'))), '2023-11-01-preview').loginServer]"
+            },
+            "AZURE_CONTAINER_REGISTRY_NAME": {
+              "type": "string",
+              "value": "[format('acr{0}', variables('resourceToken'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[subscriptionResourceId('Microsoft.Resources/resourceGroups', parameters('resourceGroupName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "AGENT_FQDN": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'workload'), '2025-04-01').outputs.AGENT_FQDN.value]"
+    },
+    "AGENT_RESOURCE_GROUP": {
+      "type": "string",
+      "value": "[parameters('resourceGroupName')]"
+    },
+    "AGENT_CONTAINER_APP_NAME": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'workload'), '2025-04-01').outputs.AGENT_CONTAINER_APP_NAME.value]"
+    },
+    "AGENT_PRINCIPAL_ID": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'workload'), '2025-04-01').outputs.AGENT_PRINCIPAL_ID.value]"
+    },
+    "AGENT_AUTH_MODE": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'workload'), '2025-04-01').outputs.AGENT_AUTH_MODE.value]"
+    },
+    "AZURE_CONTAINER_REGISTRY_ENDPOINT": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'workload'), '2025-04-01').outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT.value]"
+    },
+    "AZURE_CONTAINER_REGISTRY_NAME": {
+      "type": "string",
+      "value": "[reference(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', subscription().subscriptionId, parameters('resourceGroupName')), 'Microsoft.Resources/deployments', 'workload'), '2025-04-01').outputs.AZURE_CONTAINER_REGISTRY_NAME.value]"
+    }
+  }
+}

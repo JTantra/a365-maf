@@ -3,25 +3,22 @@
     "tasks": [
         {
             // Check all required prerequisites.
-            // See https://aka.ms/teamsfx-tasks/check-prerequisites to know the details and how to customize the args.
+            // Uses a shell task instead of a Toolkit-specific task provider so it works reliably in Dev Containers.
             "label": "Validate prerequisites (Microsoft 365 Agents Playground)",
-            "type": "teamsfx",
-            "command": "debug-check-prerequisites",
-            "args": {
-                "prerequisites": [
-                    "nodejs", // Check if Node.js is installed and the version is >= 12.
-                    "portOccupancy" // Validate available ports to ensure those debug ones are not occupied.
-                ],
-                "portOccupancy": [
-                    3978, // app service port
-                    56150, // Microsoft 365 Agents Playground port
-                ]
-            }
+            "type": "shell",
+            "command": "node",
+            "args": [
+                "${workspaceFolder}/.vscode/scripts/validate-playground-prerequisites.mjs"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
         },
         {
             "label": "Refresh bearer token (Microsoft 365 Agents Playground)",
             "type": "shell",
-            "command": "powershell",
+            "command": "pwsh",
             "args": [
                 "-NoProfile",
                 "-ExecutionPolicy",
@@ -35,18 +32,28 @@
         },
         {
             // Build project.
-            // See https://aka.ms/teamsfx-tasks/deploy to know the details and how to customize the args.
+            // Runs the Microsoft 365 Agents Toolkit deploy lifecycle for the Playground environment.
             "label": "Deploy (Microsoft 365 Agents Playground)",
             "dependsOn": [
                 "Validate prerequisites (Microsoft 365 Agents Playground)",
                 "Refresh bearer token (Microsoft 365 Agents Playground)"
             ],
             "dependsOrder": "sequence",
-            "type": "teamsfx",
-            "command": "deploy",
-            "args": {
-                "env": "playground"
-            }
+            "type": "shell",
+            "command": "atk",
+            "args": [
+                "deploy",
+                "--env",
+                "playground",
+                "--config-file-path",
+                "${workspaceFolder}/m365agents.playground.yml",
+                "--interactive",
+                "false"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
         },
     ]
 }

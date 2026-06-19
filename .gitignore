@@ -29,3 +29,10 @@ venv/
 
 # Dev tool directories
 /devTools/
+
+manifest/
+Agent365-devTools/
+
+# Agent 365 generated state / secrets
+a365.generated.config.json
+a365.generated.config.*.json

@@ -55,6 +55,14 @@
       "scope": "McpServers.WebSearch.All",
       "audience": "ea9ffc3e-8a23-4a7d-836d-234d7c7565c1",
       "publisher": "Microsoft"
+    },
+    {
+      "mcpServerName": "mcp_SharePointTools",
+      "mcpServerUniqueName": "mcp_SharePointTools"
+    },
+    {
+      "mcpServerName": "mcp_WordTools",
+      "mcpServerUniqueName": "mcp_WordTools"
     }
   ]
 }

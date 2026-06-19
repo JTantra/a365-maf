@@ -6,7 +6,7 @@ ms.date: 2026-06-19
 ms.topic: tutorial
 ---
 
-## Lab outcome
+## Agent 365 AI Teammates Hands-On Lab
 
 By the end of this lab, you will have:
 

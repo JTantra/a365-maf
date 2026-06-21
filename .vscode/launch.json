@@ -5,7 +5,7 @@
             "name": "Start Python",
             "type": "debugpy",
             "request": "launch",
-            "python": "${workspaceFolder}/.venv/Scripts/python.exe",
+            "python": "${workspaceFolder}/.venv/bin/python",
             "program": "${workspaceFolder}/start_with_generic_host.py",
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",
@@ -24,7 +24,7 @@
                 "start"
             ],
             "env": {
-            "PATH": "${workspaceFolder}/devTools/nodejs;${env:PATH}"
+                "PATH": "${workspaceFolder}/devTools/nodejs:${env:PATH}"
             },
             "cwd": "${workspaceFolder}",
             "console": "integratedTerminal",

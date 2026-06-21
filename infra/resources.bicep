@@ -20,6 +20,9 @@ param location string
 @description('Existing Azure OpenAI / Foundry account name to grant the MI access to.')
 param azureOpenAiAccountName string
 
+@description('Subscription ID containing the existing AOAI / Foundry account.')
+param azureOpenAiSubscriptionId string
+
 @description('Resource group containing the existing AOAI / Foundry account.')
 param azureOpenAiResourceGroup string
 
@@ -128,12 +131,36 @@ resource registry 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = 
   }
 }
 
+// Give Container Apps a registry pull identity that exists before the app
+// revision is created. Using the Container App system identity for registry
+// pulls creates a first-provision cycle: the app revision needs AcrPull to
+// start, but the system identity principal does not exist until the app exists.
+resource registryPullIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: 'id-acrpull-${resourceToken}'
+  location: location
+  tags: tags
+}
+
+// Built-in role definition IDs (constants):
+//   AcrPull = 7f951dda-4ed3-4680-a7ca-43fe172d538d
+var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+
+resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: registry
+  name: guid(registry.id, registryPullIdentity.id, acrPullRoleId)
+  properties: {
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
+    principalId: registryPullIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
+
 // ----- Container App -------------------------------------------------------
 // Image starts as a placeholder; `azd deploy` overrides it via the
 // `containerapp update --image` call after pushing to the registry.
 
-@description('Initial container image reference. Override on first provision when a real image already exists in ACR (k8se/quickstart listens on port 80 and fails the 3978 probe).')
-param initialImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+@description('Initial container image reference. Must listen on the Container App ingress target port before azd deploy replaces it with the real image.')
+param initialImage string = 'mcr.microsoft.com/dotnet/samples:aspnetapp'
 var placeholderImage = initialImage
 var resolvedTenantId = empty(blueprintTenantId) ? subscription().tenantId : blueprintTenantId
 var authEnabled = !empty(blueprintClientId) && !empty(blueprintClientSecret)
@@ -143,6 +170,10 @@ var authEnabled = !empty(blueprintClientId) && !empty(blueprintClientSecret)
 var baseEnv = [
   { name: 'HOST', value: '0.0.0.0' }
   { name: 'PORT', value: '3978' }
+  // The first provision uses the public .NET sample placeholder image. Make it
+  // listen on the same port as the real Python app so Container Apps can create
+  // the initial revision before `azd deploy` replaces the image.
+  { name: 'ASPNETCORE_HTTP_PORTS', value: '3978' }
   { name: 'AZURE_OPENAI_ENDPOINT', value: azureOpenAiEndpoint }
   { name: 'AZURE_OPENAI_DEPLOYMENT', value: azureOpenAiDeployment }
   { name: 'AZURE_OPENAI_API_VERSION', value: azureOpenAiApiVersion }
@@ -160,21 +191,32 @@ var baseEnv = [
   { name: 'ENABLE_A365_OBSERVABILITY_EXPORTER', value: 'true' }
 ]
 
+// The Microsoft Agents SDK connection manager requires a service connection
+// entry to exist even during the first anonymous deployment. Keep the shape in
+// place with empty credentials until blueprint credentials are supplied.
+var serviceConnectionEnv = [
+  { name: 'CONNECTIONSMAP__0__SERVICEURL', value: '*' }
+  { name: 'CONNECTIONSMAP__0__CONNECTION', value: 'SERVICE_CONNECTION' }
+  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID', value: authEnabled ? blueprintClientId : '' }
+  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID', value: authEnabled ? resolvedTenantId : '' }
+  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__SCOPES', value: graphScope }
+]
+
+var serviceConnectionSecretEnv = authEnabled ? [
+  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET', secretRef: 'blueprint-client-secret' }
+] : [
+  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET', value: '' }
+]
+
 var authEnv = authEnabled ? [
   { name: 'AUTH_HANDLER_NAME', value: 'AGENTIC' }
   { name: 'USE_AGENTIC_AUTH', value: 'true' }
   { name: 'CLIENT_ID', value: blueprintClientId }
   { name: 'TENANT_ID', value: resolvedTenantId }
   { name: 'CLIENT_SECRET', secretRef: 'blueprint-client-secret' }
-  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTID', value: blueprintClientId }
-  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__TENANTID', value: resolvedTenantId }
-  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__CLIENTSECRET', secretRef: 'blueprint-client-secret' }
-  { name: 'CONNECTIONS__SERVICE_CONNECTION__SETTINGS__SCOPES', value: graphScope }
   { name: 'AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS__AGENTIC__SETTINGS__TYPE', value: 'AgenticUserAuthorization' }
   { name: 'AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS__AGENTIC__SETTINGS__SCOPES', value: agentic365Scope }
   { name: 'AGENTAPPLICATION__USERAUTHORIZATION__HANDLERS__AGENTIC__SETTINGS__ALTERNATEBLUEPRINTCONNECTIONNAME', value: 'SERVICE_CONNECTION' }
-  { name: 'CONNECTIONSMAP_0_SERVICEURL', value: '*' }
-  { name: 'CONNECTIONSMAP_0_CONNECTION', value: 'SERVICE_CONNECTION' }
 ] : []
 
 var authSecrets = authEnabled ? [
@@ -190,7 +232,10 @@ resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
     'azd-service-name': 'agent'
   })
   identity: {
-    type: 'SystemAssigned'
+    type: 'SystemAssigned, UserAssigned'
+    userAssignedIdentities: {
+      '${registryPullIdentity.id}': {}
+    }
   }
   properties: {
     managedEnvironmentId: containerAppsEnv.id
@@ -204,7 +249,7 @@ resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
       registries: [
         {
           server: registry.properties.loginServer
-          identity: 'system'
+          identity: registryPullIdentity.id
         }
       ]
       secrets: authSecrets
@@ -218,7 +263,7 @@ resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json(containerCpu)
             memory: containerMemory
           }
-          env: concat(baseEnv, authEnv)
+          env: concat(baseEnv, serviceConnectionEnv, serviceConnectionSecretEnv, authEnv)
         }
       ]
       scale: {
@@ -227,26 +272,16 @@ resource agentApp 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
+  dependsOn: [
+    acrPullAssignment
+  ]
 }
 
 // ----- Role assignments ----------------------------------------------------
 // Built-in role definition IDs (constants):
-//   AcrPull                         = 7f951dda-4ed3-4680-a7ca-43fe172d538d
 //   Cognitive Services OpenAI User = 5e0bd9bd-7b93-4f28-af87-19fc36ad61bd
 
-var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
 var cogSvcOpenAIUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-
-// Let the Container App MI pull images from our registry.
-resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  scope: registry
-  name: guid(registry.id, agentApp.id, acrPullRoleId)
-  properties: {
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
-    principalId: agentApp.identity.principalId
-    principalType: 'ServicePrincipal'
-  }
-}
 
 // Grant the MI Cognitive Services OpenAI User on the existing AOAI / Foundry
 // account. The submodule targets that account's resource group so the role
@@ -254,7 +289,7 @@ resource acrPullAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' 
 // RG than the workload.
 module aoaiRoleAssignment 'modules/aoai-role-assignment.bicep' = {
   name: 'aoai-role-assignment'
-  scope: resourceGroup(azureOpenAiResourceGroup)
+  scope: resourceGroup(azureOpenAiSubscriptionId, azureOpenAiResourceGroup)
   params: {
     aoaiAccountName: azureOpenAiAccountName
     principalId: agentApp.identity.principalId

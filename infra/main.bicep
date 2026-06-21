@@ -23,6 +23,9 @@ param resourceGroupName string = 'rg-${environmentName}'
 @description('Existing Azure OpenAI / Foundry account name to grant the agent MI access to.')
 param azureOpenAiAccountName string = 'terenceaifoundry-resource'
 
+@description('Subscription ID containing the existing Azure OpenAI / Foundry account. Defaults to the deployment subscription.')
+param azureOpenAiSubscriptionId string = subscription().subscriptionId
+
 @description('Resource group containing the existing AOAI / Foundry account. The role assignment is created here.')
 param azureOpenAiResourceGroup string = 'rg-admin-terenceaifoundry'
 
@@ -64,8 +67,8 @@ param blueprintTenantId string = ''
 @secure()
 param blueprintClientSecret string = ''
 
-@description('Initial container image reference for the first provision. Override when a real image already exists in ACR.')
-param initialImage string = 'mcr.microsoft.com/k8se/quickstart:latest'
+@description('Initial container image reference for the first provision. Must listen on the Container App ingress target port before azd deploy replaces it with the real image.')
+param initialImage string = 'mcr.microsoft.com/dotnet/samples:aspnetapp'
 
 // ----- Resource group ------------------------------------------------------
 
@@ -86,6 +89,7 @@ module workload 'resources.bicep' = {
     environmentName: environmentName
     location: location
     azureOpenAiAccountName: azureOpenAiAccountName
+    azureOpenAiSubscriptionId: azureOpenAiSubscriptionId
     azureOpenAiResourceGroup: azureOpenAiResourceGroup
     azureOpenAiEndpoint: azureOpenAiEndpoint
     azureOpenAiDeployment: azureOpenAiDeployment

@@ -1,0 +1,75 @@
+{
+  "name": "a365-maf",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": false,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "8.0"
+    },
+    "ghcr.io/devcontainers/features/azure-cli:1": {},
+    "ghcr.io/devcontainers/features/powershell:1": {}
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "containerEnv": {
+    "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+    "UV_LINK_MODE": "copy"
+  },
+  "remoteEnv": {
+    "PATH": "${containerEnv:PATH}:/home/vscode/.dotnet/tools:/home/vscode/.azd/bin:/home/vscode/.local/bin"
+  },
+  "forwardPorts": [
+    3978,
+    56150
+  ],
+  "portsAttributes": {
+    "3978": {
+      "label": "Agent host",
+      "onAutoForward": "notify"
+    },
+    "56150": {
+      "label": "Microsoft 365 Agents Playground",
+      "onAutoForward": "notify"
+    }
+  },
+  "mounts": [
+    "source=a365-maf-azure-cache,target=/home/vscode/.azure,type=volume",
+    "source=a365-maf-azd-cache,target=/home/vscode/.azd,type=volume",
+    "source=a365-maf-a365-cache,target=/home/vscode/.config/a365,type=volume",
+    "source=a365-maf-dotnet-tools,target=/home/vscode/.dotnet/tools,type=volume",
+    "source=a365-maf-powershell-modules,target=/home/vscode/.local/share/powershell/Modules,type=volume",
+    "source=a365-maf-uv-cache,target=/home/vscode/.cache/uv,type=volume"
+  ],
+  "postCreateCommand": "sudo mkdir -p /home/vscode/.azure /home/vscode/.azd /home/vscode/.config/a365 /home/vscode/.dotnet/tools /home/vscode/.local/share/powershell/Modules /home/vscode/.cache/uv && sudo chown -R vscode:vscode /home/vscode/.azure /home/vscode/.azd /home/vscode/.config /home/vscode/.dotnet /home/vscode/.local /home/vscode/.cache && bash .devcontainer/setup-tools.sh",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+        "python.terminal.activateEnvironment": true,
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.eol": "\n"
+      },
+      "extensions": [
+        "TeamsDevApp.ms-teams-vscode-extension",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-vscode.powershell",
+        "ms-azuretools.azure-dev",
+        "ms-azuretools.vscode-azureresourcegroups",
+        "ms-azuretools.vscode-bicep",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml"
+      ]
+    }
+  }
+}

@@ -68,6 +68,7 @@
         "ms-azuretools.vscode-azureresourcegroups",
         "ms-azuretools.vscode-bicep",
         "ms-azuretools.vscode-docker",
+        "hediet.vscode-drawio",
         "redhat.vscode-yaml"
       ]
     }

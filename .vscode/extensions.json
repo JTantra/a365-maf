@@ -1,6 +1,7 @@
 {
   "recommendations": [
     "TeamsDevApp.ms-teams-vscode-extension",
-    "ms-python.python"
+    "ms-python.python",
+    "hediet.vscode-drawio"
   ]
 }

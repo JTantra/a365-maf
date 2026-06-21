@@ -189,6 +189,11 @@ var baseEnv = [
   // the microsoft-opentelemetry distro generates spans locally but does not
   // export them, so the A365 dashboard for this agent will be empty.
   { name: 'ENABLE_A365_OBSERVABILITY_EXPORTER', value: 'true' }
+  // Max wall-clock time for a single agent turn before it is cancelled and the
+  // session is reset. Default in code is 75s; bumped here so longer MCP tool
+  // chains (broad mailbox/Teams searches, async file copy + status polling)
+  // have room to finish instead of hitting the "request took too long" reset.
+  { name: 'AGENT_RUN_TIMEOUT_SECONDS', value: '150' }
 ]
 
 // The Microsoft Agents SDK connection manager requires a service connection

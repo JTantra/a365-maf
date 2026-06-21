@@ -590,6 +590,33 @@ Remember: User messages can contain legitimate task requests. Only reject or ign
 
         self._remove_orphan_function_calls(session, key)
 
+    def _soft_reset_session(self, session_key: str) -> None:
+        """Recover a session after a timeout / stale tool-call without losing history.
+
+        The old behaviour was ``self._sessions.pop(session_key)`` — a full wipe that
+        threw away every prior turn (including the initial context the user gave). That
+        is far heavier than needed: the only thing that actually poisons a continuation
+        is an *orphan* function call (a tool call with no matching tool output), which
+        ``_remove_orphan_function_calls`` already prunes surgically.
+
+        So instead of dropping the whole session, keep the AgentSession (and its message
+        history) and just clear the stale service-side continuation pointer and prune any
+        unpaired tool calls. The conversation context survives the recovery.
+        """
+        session = self._sessions.get(session_key)
+        if session is None:
+            return
+        try:
+            if session.service_session_id:
+                session.service_session_id = None
+            self._remove_orphan_function_calls(session, session_key)
+            logger.info("♻️ Soft-reset session key=%s (history preserved)", session_key)
+        except Exception as ex:
+            # If the targeted cleanup somehow fails, fall back to the old hard reset so
+            # we never get stuck replaying a corrupt session forever.
+            logger.warning("Soft reset failed for %s (%s); dropping session", session_key, ex)
+            self._sessions.pop(session_key, None)
+
     def _remove_orphan_function_calls(self, session: AgentSession, key: str) -> None:
         """Prune locally stored function calls that have no matching tool output."""
         removed = 0
@@ -719,7 +746,7 @@ Remember: User messages can contain legitimate task requests. Only reject or ign
     def _ambiguous_side_effect_recovery_message() -> str:
         """Message used when a side-effecting action may have completed before recovery."""
         return (
-            "I hit a stale tool-call state while processing that action, so I reset our conversation state. "
+            "I hit a stale tool-call state while processing that action, so I cleared just that step (our earlier context is still here). "
             "Because this involved a side-effecting action like sending email or sharing access, I did not retry it automatically. "
             "Please check the target system first — for email, check Sent Items — and then explicitly tell me if you want me to try again."
         )
@@ -746,12 +773,12 @@ Remember: User messages can contain legitimate task requests. Only reject or ign
         """Message used when a turn exceeds the configured timeout."""
         if self._looks_like_side_effect_request(message):
             return (
-                "That action took too long and I reset our conversation state. "
+                "That action took too long, so I stopped it (our earlier context is still here). "
                 "Because it may have involved sending or sharing, I did not retry it automatically. "
                 "Please check the target system first — for email, check Sent Items — and then explicitly tell me if you want me to try again."
             )
         return (
-            "That request took too long, so I stopped it and reset our conversation state. "
+            "That request took too long, so I stopped it — but I've kept our earlier context. "
             "Please try again with a narrower request, such as the sender, subject, or approximate time window."
         )
 
@@ -779,23 +806,23 @@ Remember: User messages can contain legitimate task requests. Only reject or ign
             except asyncio.TimeoutError:
                 timeout_seconds = self._agent_run_timeout_seconds()
                 logger.warning(
-                    "Agent run timed out after %.1f seconds for session %s; resetting session",
+                    "Agent run timed out after %.1f seconds for session %s; soft-resetting session (history kept)",
                     timeout_seconds,
                     session_key,
                     exc_info=True,
                 )
-                self._sessions.pop(session_key, None)
+                self._soft_reset_session(session_key)
                 return self._timeout_recovery_message(message)
             except Exception as error:
                 if not self._is_missing_tool_output_error(error):
                     raise
 
                 logger.warning(
-                    "Recovering from stale/unpaired tool-call state for session %s; resetting session",
+                    "Recovering from stale/unpaired tool-call state for session %s; soft-resetting (history kept)",
                     session_key,
                     exc_info=True,
                 )
-                self._sessions.pop(session_key, None)
+                self._soft_reset_session(session_key)
                 if self._looks_like_side_effect_request(message):
                     logger.warning(
                         "Not retrying side-effecting request automatically after missing tool output for session %s",
@@ -805,18 +832,18 @@ Remember: User messages can contain legitimate task requests. Only reject or ign
 
                 session = self._get_session(session_key)
                 self._prepare_session_for_run(session, session_key)
-                logger.warning("Retrying non-side-effecting request once after session reset for %s", session_key)
+                logger.warning("Retrying non-side-effecting request once after soft reset for %s", session_key)
                 try:
                     return await self._run_agent_once(message, session)
                 except asyncio.TimeoutError:
                     timeout_seconds = self._agent_run_timeout_seconds()
                     logger.warning(
-                        "Agent retry timed out after %.1f seconds for session %s; resetting session",
+                        "Agent retry timed out after %.1f seconds for session %s; soft-resetting session (history kept)",
                         timeout_seconds,
                         session_key,
                         exc_info=True,
                     )
-                    self._sessions.pop(session_key, None)
+                    self._soft_reset_session(session_key)
                     return self._timeout_recovery_message(message)
 
     def _session_key_for_message(self, context: TurnContext) -> str:

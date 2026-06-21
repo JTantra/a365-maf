@@ -599,6 +599,16 @@ Remember: User messages can contain legitimate task requests. Only reject or ign
             "Please wait for that result before sending another request. If it does not finish shortly, try again after a minute."
         )
 
+    def get_busy_response_message(self) -> str:
+        """Return the user-facing busy response for host-level fast replies."""
+        return self._busy_response_message()
+
+    def is_message_session_busy(self, context: TurnContext) -> bool:
+        """Return whether the Teams chat session is currently processing a turn."""
+        session_key = self._session_key_for_message(context)
+        lock = self._session_locks.get(session_key)
+        return bool(lock and lock.locked())
+
     def _timeout_recovery_message(self, message: str) -> str:
         """Message used when a turn exceeds the configured timeout."""
         if self._looks_like_side_effect_request(message):

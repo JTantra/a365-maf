@@ -171,6 +171,51 @@ class GenericAgentHost:
         await self._setup_observability_token(context, tenant_id, agent_id)
         return tenant_id, agent_id
 
+    def _acknowledgement_for_message(self, user_message: str) -> str:
+        """Return a short, contextual Teams acknowledgement for conversational turns."""
+        normalized = " ".join((user_message or "").lower().split())
+
+        if any(term in normalized for term in ("stop", "cancel", "never mind", "nevermind", "hold off")):
+            return "Understood — I’ll hold off on that."
+
+        if any(term in normalized for term in ("email", "mail", "inbox", "reply", "response")):
+            if any(term in normalized for term in ("check", "find", "received", "response", "reply", "inbox")):
+                return "I’ll check your mailbox for that and report back…"
+            if any(term in normalized for term in ("send", "forward", "cc", "bcc")):
+                return "I’ll handle that email request and confirm the result…"
+
+        if any(term in normalized for term in ("share", "access", "permission", "document", "doc", "file")):
+            return "I’ll check the document access details and update you…"
+
+        if any(term in normalized for term in ("compare", "comparison", "table")):
+            return "I’ll put that comparison together…"
+
+        return "I’m on it — I’ll update you shortly…"
+
+    def _is_agent_message_session_busy(self, context: TurnContext) -> bool:
+        """Ask the hosted agent whether this chat already has an in-flight turn."""
+        busy_check = getattr(self.agent_instance, "is_message_session_busy", None)
+        if not callable(busy_check):
+            return False
+        try:
+            return bool(busy_check(context))
+        except Exception as ex:
+            logger.warning("Busy-state check failed; continuing with normal flow: %s", ex)
+            return False
+
+    def _agent_busy_response_message(self) -> str:
+        """Return a busy message from the hosted agent when available."""
+        message_factory = getattr(self.agent_instance, "get_busy_response_message", None)
+        if callable(message_factory):
+            try:
+                return str(message_factory())
+            except Exception as ex:
+                logger.warning("Busy response factory failed; using fallback: %s", ex)
+        return (
+            "I'm still working on the previous request in this chat. "
+            "Please wait for that result before sending another request."
+        )
+
     # --- Handlers (Messages & Notifications) ---
     def _setup_handlers(self):
         """Setup message and notification handlers"""
@@ -351,11 +396,15 @@ class GenericAgentHost:
 
                     logger.info(f"📨 {user_message}")
 
+                    if self._is_agent_message_session_busy(context):
+                        await context.send_activity(self._agent_busy_response_message())
+                        return
+
                     # Multiple messages pattern: send an immediate acknowledgment before the LLM work begins.
                     # Each send_activity call produces a discrete Teams message.
                     # NOTE: For Teams agentic identities, streaming is buffered into a single message by the SDK;
                     #       use send_activity for any messages that must arrive immediately.
-                    await context.send_activity("Got it — working on it…")
+                    await context.send_activity(self._acknowledgement_for_message(user_message))
                     await context.send_activity(Activity(type="typing"))
 
                     # Typing indicator loop — refreshes the "..." animation every ~4s for long-running operations.

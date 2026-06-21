@@ -37,7 +37,18 @@ Set up the Python virtual environment manually before running the agent or deplo
 	- macOS/Linux: `source .venv/bin/activate`
 
 ## Agent365 Configuration
-For more in-depth configuration of Agent365, refer to this [readme](./docs/AGENT365-SETUP.md)
+
+For end-to-end workshop instructions, use the Agent 365 AI Teammate hands-on lab:
+
+- [Agent 365 AI Teammates Hands-On Lab (Markdown)](./docs/AGENT365-HANDS-ON-LAB.md)
+- [Agent 365 AI Teammates Hands-On Lab (PDF)](./docs/AGENT365-HANDS-ON-LAB.pdf)
+
+The lab walks through creating an Agent 365 AI Teammate blueprint, configuring
+permissions, publishing the manifest, deploying the backend to Azure Container
+Apps, creating an agent instance, and collaborating with the AI Teammate from
+Microsoft Teams or the Microsoft 365 Copilot app.
+
+For deeper configuration details, refer to the [Agent 365 setup guide](./docs/AGENT365-SETUP.md).
 
 ## Working with User Identity
 
@@ -131,7 +142,7 @@ Each `send_activity` call produces a separate Teams message. You can call it as 
 
 To set up and test this agent, refer to the [Configure Agent Testing](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/testing?tabs=python) guide for complete instructions.
 
-For a detailed explanation of the agent code and implementation, see the [Agent Code Walkthrough](AGENT-CODE-WALKTHROUGH.md).
+For a detailed explanation of the agent code and implementation, see the [Agent Code Walkthrough](./docs/AGENT-CODE-WALKTHROUGH.md).
 
 ## Support
 

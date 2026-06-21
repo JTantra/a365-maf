@@ -29,3 +29,19 @@ Where AOR documents are created and tracked. Use it to:
 - Check for an existing work-in-progress AOR before creating a new one (avoid duplicates).
 - Create the new AOR document (titled with its AOR ID) from the template.
 - Record vendor quotes, decisions, and compliance notes as the case progresses.
+
+## Other context sources (beyond the two folders)
+
+The case lives across more than SharePoint. Use these MCP tool servers to gather and
+correlate context, always keyed by the AOR ID and the event name:
+
+- **`mcp_TeamsServer`** — read this chat and other Teams chats/channels about the event;
+  rename the event's group chat to include the AOR ID.
+- **`mcp_MailTools`** — find and send email (vendor quote requests/replies, approvals);
+  keep the AOR ID in the subject.
+- **`mcp_CalendarTools`** — confirm event date, attendees, and holds.
+- **`mcp_M365Copilot`** — broad retrieval across the organiser's accessible content when
+  you are unsure where something lives.
+
+> Do not rely on short-lived chat memory. After any reset, re-gather context from these
+> sources using the AOR ID.

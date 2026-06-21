@@ -435,12 +435,28 @@ POST.
 
 Complete these steps in the browser:
 
-1. Open the Microsoft 365 admin center.
-2. Publish or approve the custom agent package for the tenant.
-3. In Teams, find the published agent.
-4. Create or request an instance.
-5. Wait for the agent user account to appear in Teams.
-6. Start a chat with the new agent user and send `hello`.
+1. Open the Microsoft 365 admin center at <https://admin.microsoft.com>.
+2. In the left navigation, select **Agents** > **All agents** > **Upload custom
+   agent**. Upload the `manifest.zip` package created by `a365 publish`. If the
+   browser asks for the package location, use the generated zip file under the
+   repository's `manifest/` folder.
+3. Review the custom agent details in the upload wizard. When prompted for
+   tenant availability, configure the **Publish** and **Activate** scopes:
+   * Use **Publish** to control who can see or request the agent from the tenant
+     catalog.
+   * Use **Activate** to control who can create an AI Teammate instance without
+     admin approval. For a preview lab, prefer a specific pilot user or group
+     instead of all users.
+4. Complete the upload or approval flow so the custom agent appears in the
+   tenant catalog.
+5. In Teams or the Microsoft 365 Copilot app, open **Apps** and search for the
+   published agent name.
+6. Select **Create instance** or **Request instance**. If approval is required,
+   a tenant admin approves it from the Microsoft 365 admin center under
+   **Agents** > **Requested agents**.
+7. Wait for Microsoft 365 to create the agent user account. During preview this
+   can take several minutes.
+8. Start a chat with the new AI Teammate and send `hello`.
 
 Every instance created from the same blueprint posts to the same backend
 endpoint. The Python app uses the incoming activity metadata to distinguish

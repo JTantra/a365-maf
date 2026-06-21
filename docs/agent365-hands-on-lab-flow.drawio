@@ -1,0 +1,199 @@
+<mxfile host="65bd71144e">
+    <diagram id="agent365-lab-flow" name="Hands-on Lab Flow">
+        <mxGraphModel dx="534" dy="313" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="flow-title" value="Agent 365 AI Teammate Hands-On Lab Flow" style="text;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;align=center;whiteSpace=wrap;html=1;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="20" width="670" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-prep" value="Facilitator Prep&lt;br&gt;Tenant, roles, tools, Azure OpenAI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="1" vertex="1">
+                    <mxGeometry x="40" y="110" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-devcontainer" value="1. Open Dev Container&lt;br&gt;Use consistent toolchain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="110" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-config" value="2-4. Configure Local Context&lt;br&gt;Variables, sign-in, prerequisites" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="460" y="110" width="190" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-blueprint" value="5. Create AI Teammate Blueprint&lt;br&gt;a365 setup all --aiteammate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="110" width="210" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-manifest" value="6. Publish Manifest&lt;br&gt;Upload manifest.zip to Admin Center" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="950" y="110" width="180" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-azd" value="7. Create azd Environment&lt;br&gt;Set Azure and Microsoft Foundry AOAI values" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="130" y="300" width="190" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-deploy" value="8. Deploy Backend&lt;br&gt;Azure Container Apps endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="370" y="300" width="190" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-endpoint" value="9. Register /api/messages&lt;br&gt;Bind endpoint to blueprint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" parent="1" vertex="1">
+                    <mxGeometry x="610" y="300" width="190" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-auth" value="10-11. Enable and Verify Auth&lt;br&gt;Blueprint secret, health, 401 probe" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="1" vertex="1">
+                    <mxGeometry x="850" y="300" width="210" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-instance" value="12. Create AI Teammate Instance&lt;br&gt;Teams or Microsoft 365 Copilot app" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="500" width="220" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-test" value="13. Test and Watch Logs&lt;br&gt;Teams chat, Container App logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="1" vertex="1">
+                    <mxGeometry x="520" y="500" width="210" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-troubleshoot" value="Troubleshoot / Cleanup&lt;br&gt;Endpoint, auth, MCP, azd down" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="500" width="210" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-note" value="Local-only files: a365.config.json, a365.generated.config.json, .env, .azure/" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="660" width="630" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-prep" target="flow-devcontainer" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-devcontainer" target="flow-config" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e3" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-config" target="flow-blueprint" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e4" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-blueprint" target="flow-manifest" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e5" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-manifest" target="flow-azd" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1040" y="230"/>
+                            <mxPoint x="225" y="230"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-e6" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-azd" target="flow-deploy" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e7" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-deploy" target="flow-endpoint" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e8" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-endpoint" target="flow-auth" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e9" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-auth" target="flow-instance" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="955" y="430"/>
+                            <mxPoint x="360" y="430"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="flow-e10" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-instance" target="flow-test" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="flow-e11" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" parent="1" source="flow-test" target="flow-troubleshoot" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="agent365-runtime-architecture" name="Runtime Architecture">
+        <mxGraphModel dx="1169" dy="827" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="arch-title" value="Agent 365 Blueprint, Instance, Runtime, and Tools" style="text;strokeColor=none;fillColor=none;fontSize=18;fontStyle=1;align=center;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="220" y="20" width="730" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="tier-admin" value="Tenant and Publishing" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;startSize=30;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="80" width="1080" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="admin-center" value="Microsoft 365 Admin Center&lt;br&gt;Agents &gt; All agents &gt; Upload custom agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="tier-admin">
+                    <mxGeometry x="40" y="50" width="250" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="catalog-package" value="manifest.zip&lt;br&gt;manifest.json + template + icons" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="tier-admin">
+                    <mxGeometry x="350" y="50" width="230" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="blueprint" value="Agent 365 Blueprint&lt;br&gt;Entra app, SP, OAuth grants, endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="tier-admin">
+                    <mxGeometry x="660" y="50" width="250" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="tier-client" value="User Experience and Instance" style="swimlane;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;startSize=30;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="230" width="1080" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="teams-copilot" value="Microsoft Teams / M365 Copilot app&lt;br&gt;User chats with AI Teammate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="tier-client">
+                    <mxGeometry x="80" y="60" width="260" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent-instance" value="AI Teammate Instance&lt;br&gt;Licensed agent user, mailbox, identity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="tier-client">
+                    <mxGeometry x="430" y="60" width="260" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="activity" value="Agentic Activity&lt;br&gt;tenant_id, agent_id, human user identity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="tier-client">
+                    <mxGeometry x="780" y="60" width="240" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="tier-runtime" value="Azure Runtime" style="swimlane;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;startSize=30;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="400" width="1080" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="endpoint" value="/api/messages&lt;br&gt;public HTTPS endpoint" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="tier-runtime">
+                    <mxGeometry x="60" y="60" width="210" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="aca" value="Azure Container Apps&lt;br&gt;Python host_agent_server.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="tier-runtime">
+                    <mxGeometry x="330" y="60" width="230" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="agent-framework" value="Agent Framework Agent&lt;br&gt;OpenAIChatClient + MCP tools" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="tier-runtime">
+                    <mxGeometry x="630" y="60" width="250" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="logs" value="Log Analytics / ACA Logs&lt;br&gt;health, typing, MCP calls" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="tier-runtime">
+                    <mxGeometry x="930" y="60" width="130" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="tier-services" value="AI and Microsoft 365 Tooling" style="swimlane;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;startSize=30;" vertex="1" parent="1">
+                    <mxGeometry x="40" y="590" width="1080" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="azure-openai" value="Azure OpenAI / Foundry&lt;br&gt;responses API deployment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="tier-services">
+                    <mxGeometry x="60" y="70" width="210" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-gateway" value="Agent 365 Tooling Gateway&lt;br&gt;discovers MCP servers by instance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="tier-services">
+                    <mxGeometry x="330" y="70" width="250" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="mcp-tools" value="MCP Servers&lt;br&gt;Mail, Calendar, Teams, Word, Excel&lt;br&gt;OneDrive, SharePoint, Web Search" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="tier-services">
+                    <mxGeometry x="640" y="60" width="250" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="storage" value="Local config and secrets&lt;br&gt;.azure/, .env, a365.generated.config.json" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="tier-services">
+                    <mxGeometry x="930" y="60" width="130" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e1" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="catalog-package" target="admin-center">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e2" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="admin-center" target="blueprint">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e3" value="creates / requests" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="teams-copilot" target="agent-instance">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e4" value="inherits permissions" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="blueprint" target="agent-instance">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e5" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="agent-instance" target="activity">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e6" value="POST activity" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="activity" target="endpoint">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e7" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="endpoint" target="aca">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e8" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="aca" target="agent-framework">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e9" value="prompt / response" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="agent-framework" target="azure-openai">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e10" value="discover tools" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="agent-framework" target="mcp-gateway">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e11" value="invoke" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="mcp-gateway" target="mcp-tools">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e12" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="aca" target="logs">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="arch-e13" value="env vars" style="edgeStyle=orthogonalEdgeStyle;html=1;endArrow=block;" edge="1" parent="1" source="storage" target="aca">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

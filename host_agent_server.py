@@ -178,6 +178,11 @@ class GenericAgentHost:
         if any(term in normalized for term in ("stop", "cancel", "never mind", "nevermind", "hold off")):
             return "Understood — I’ll hold off on that."
 
+        if any(term in normalized for term in ("calendar", "meeting", "invite", "appointment", "event")):
+            if any(term in normalized for term in ("send", "create", "schedule", "book", "set up", "setup")):
+                return "I’ll create that calendar invite and confirm the result…"
+            return "I’ll check the calendar details and report back…"
+
         if any(term in normalized for term in ("email", "mail", "inbox", "reply", "response")):
             if any(term in normalized for term in ("check", "find", "received", "response", "reply", "inbox")):
                 return "I’ll check your mailbox for that and report back…"

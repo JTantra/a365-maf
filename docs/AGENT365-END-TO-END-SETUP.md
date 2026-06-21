@@ -480,7 +480,16 @@ Expected output:
 > shared logs. If the secret is exposed, rotate it before using the blueprint in
 > production.
 
-Save these generated files if they are created:
+Create the local Agent 365 config from the example before setup:
+
+```bash
+cp a365.config.example.json a365.config.json
+```
+
+Then update `a365.config.json` for your tenant and agent name. Keep this file
+local-only; do not commit participant-specific IDs or names.
+
+Save these generated files locally if they are created:
 
 * `a365.config.json`
 * `a365.generated.config.json`

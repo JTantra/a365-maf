@@ -27,6 +27,10 @@ venv/
 # azd (Azure Developer CLI) — local env state, never commit
 .azure/
 
+# Agent 365 local user config
+a365.config.json
+!a365.config.example.json
+
 # Dev tool directories
 /devTools/
 

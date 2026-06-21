@@ -1,0 +1,9 @@
+{
+  "tenantId": "<your-tenant-id>",
+  "clientAppId": "<your-agent365-cli-client-app-id>",
+  "agentIdentityDisplayName": "<your-agent-name> Identity",
+  "agentBlueprintDisplayName": "<your-agent-name> Blueprint",
+  "agentDescription": "<your-agent-description>",
+  "aiTeammate": true,
+  "useBlueprint": null
+}

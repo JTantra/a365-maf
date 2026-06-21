@@ -68,8 +68,14 @@ where the values land and which files should stay local.
 
 ### Agent 365 configuration
 
-`a365.config.json` is the user-managed Agent 365 configuration. Before running
-setup, confirm these values match the tenant and agent name you plan to use:
+`a365.config.json` is the user-managed Agent 365 configuration. It is local-only
+and should not be committed. Create it from the example before running setup:
+
+```bash
+cp a365.config.example.json a365.config.json
+```
+
+Then update these values so they match the tenant and agent name you plan to use:
 
 * `tenantId`
 * `clientAppId`

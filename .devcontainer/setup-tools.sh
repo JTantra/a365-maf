@@ -23,6 +23,16 @@ ${marker_end}"
   done
 }
 
+configure_git_line_endings() {
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    log "Configuring Git line ending handling"
+    git config --local core.autocrlf input
+    git config --local core.eol lf
+    git config --local core.safecrlf warn
+    git config --local core.filemode false
+  fi
+}
+
 install_azd() {
   if command -v azd >/dev/null 2>&1; then
     log "Azure Developer CLI already installed"
@@ -99,7 +109,7 @@ install_bicep_cli() {
 
 install_python_dependencies() {
   log "Creating project virtual environment"
-  uv venv .venv --python python3
+  uv venv .venv --python python3 --clear
 
   log "Installing project dependencies"
   uv pip install --python .venv/bin/python -e .
@@ -121,6 +131,7 @@ print_versions() {
 
 main() {
   ensure_shell_path
+  configure_git_line_endings
   install_azd
   install_uv
   install_a365_cli

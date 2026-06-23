@@ -49,7 +49,7 @@ This demo tenant is restricted to sending emails outside so for this demo we can
 
 ## 6. Reply email with a fake quotation
 
-Right now you should have received an email from the agent - login to outlook and reply below and check that the subject has something like `Quotation Request for ...` as the subject and not just a `Draft`. Copy the fake quotation into an email reply.
+Right now you should have received an email from the agent - login to outlook and reply below and check that the subject is something like `Re: [AOR-2026-AIEO-001] Quotation Request for CPFB AIEO Team Building` and not just a `Draft...`. Copy the below quotation into an email reply.
 
 ```
 Dear CPF Board Team,

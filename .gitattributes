@@ -1,0 +1,25 @@
+# Normalize text files in Git and check them out as LF on every platform.
+* text=auto eol=lf
+
+# Keep Linux/dev-container scripts and container files portable.
+.gitattributes text eol=lf
+.editorconfig text eol=lf
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+Dockerfile text eol=lf
+.devcontainer/Dockerfile text eol=lf
+
+# Keep Windows command scripts in their native format if they are added later.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Never try to normalize binary artifacts.
+*.drawio.png binary
+*.gif binary
+*.ico binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.png binary
+*.zip binary

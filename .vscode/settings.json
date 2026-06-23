@@ -1,5 +1,6 @@
 {
 	"python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
 	"chat.sessionSync.enabled": true,
-	"dotnet.defaultSolution": "disable"
+	"dotnet.defaultSolution": "disable",
+	"files.eol": "\n"
 }

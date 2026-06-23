@@ -42,7 +42,7 @@ Four things you'll create, in order:
 | Concept | What it is | Created by |
 |---|---|---|
 | **Custom client app** | One-time Entra app named `Agent 365 CLI` that the CLI itself signs in as. | Tenant admin, once per tenant (Step 2c). |
-| **Blueprint** | The agent *template* — Entra app registration + service principal + permissions + messaging endpoint. Defines *what kind of agent* this is. | `a365 setup all --agent-name <name>` (Step 4). |
+| **Blueprint** | The agent *template* — Entra app registration + service principal + permissions + messaging endpoint. Defines *what kind of agent* this is. | `a365 setup all --agent-name <name>` (Step 3). |
 | **Agent code / Azure Web App** | Your Python code that handles incoming Activities. Deployed to the Web App provisioned by setup. | `a365 deploy` (Step 5). |
 | **Agent instance** | A live **agent user** account in your tenant (its own UPN, mailbox, presence). Created from the blueprint by users or admins after the agent is published to the catalog. | User clicks **Create Instance** in Teams / admin approves (Step 6). |
 
@@ -348,7 +348,7 @@ The `requirements` subcommand:
 - For anything missing, prints detailed resolution guidance (and the PowerShell to run for privileged actions such as role assignments or admin consent).
 
 Apply any flagged fixes (in the portal per Option A, or by re-running
-`a365 setup all ...` from Step 4, which performs the privileged steps it can).
+`a365 setup all ...` from Step 3, which performs the privileged steps it can).
 
 ##### Verify
 
@@ -432,7 +432,7 @@ blueprint.
 
 > Selection is **per blueprint** — every agent instance created from this
 > blueprint inherits the same MCP set. If you change the manifest *after*
-> Step 4, re-grant the new scopes with
+> Step 3, re-grant the new scopes with
 > `a365 setup permissions mcp --agent-name <name>` (or just re-run
 > `a365 setup all`, which is idempotent). No agent code changes are needed —
 > `McpToolRegistrationService` picks up the new servers on the next turn.
@@ -541,8 +541,18 @@ scopes until restart.
 > retire the shared `ea9ffc3e-…` scopes. Use `query-entra inheritance` to
 > confirm instances will inherit whatever grants you keep.
 
-### Step 3 — Configure AI Teammate
+### Step 3 — Configure and provision AI Teammate
 From the **root of this repository**:
+
+#### 3a. Dry-run first (always)
+
+```bash
+a365 setup all --aiteammate --agent-name <your-agent-base-name> --dry-run
+```
+
+Review the resources the CLI proposes to create.
+
+#### 3b. Apply
 
 ```bash
 a365 setup all --aiteammate --agent-name <your-agent-base-name>
@@ -557,26 +567,6 @@ a365 setup all --aiteammate --agent-name <your-agent-base-name>
 
 The CLI auto-detects `tenantId`, `subscriptionId`, the client app ID, and the
 project type (Python is detected by `pyproject.toml` in this repo).
-
-### Step 4 — Provision with `a365 setup all`
-
-#### 4a. Dry-run first (always)
-
-**AI Teammate path:**
-
-```bash
-a365 setup all --dry-run
-```
-
-Review the resources the CLI proposes to create.
-
-#### 4b. Apply
-
-**AI Teammate path:**
-
-```bash
-a365 setup all
-```
 
 This single command will (the exact step list is printed by `--dry-run`):
 
@@ -607,9 +597,9 @@ CLI prints (a Global Admin must run it) to complete admin consent.
 > `a365 setup all` is **idempotent** — safe to re-run after fixing an issue.
 > Use `a365 cleanup azure` or `a365 cleanup blueprint` only as a last resort.
 
-### Step 5 — Publish & deploy (AI Teammate path only)
+### Step 4 — Publish & deploy (AI Teammate path only)
 
-#### 5a. Review your manifest
+#### 4a. Review your manifest
 
 The CLI expects `manifest/manifest.json` inside this project (it will scaffold
 one on first publish if missing). Update at least:
@@ -625,7 +615,7 @@ one on first publish if missing). Update at least:
 
 Leave `id` and `agenticUserTemplates[].id` empty — the CLI fills them in.
 
-#### 5b. Publish
+#### 4b. Publish
 
 ```bash
 a365 publish
@@ -633,7 +623,7 @@ a365 publish
 
 Registers the agent package with your tenant's catalog.
 
-#### 5c. Deploy the agent code yourself, then register the endpoint
+#### 4c. Deploy the agent code yourself, then register the endpoint
 
 > `a365 deploy` **does not exist** in CLI v1.1.x. You ship the code with your
 > `a365 deploy` **does not exist** in CLI v1.1.x. You ship the code with your
@@ -667,7 +657,7 @@ Pre-reqs:
 
 Deploying with auth is a **two-pass** flow because the Container App's public
 URL has to exist before the Agent 365 blueprint endpoint can be registered,
-and the blueprint client secret only exists after `a365 setup all` (Step 4)
+and the blueprint client secret only exists after `a365 setup all` (Step 3)
 has created the blueprint. Both passes use the same `azd up`.
 
 ###### Pass 1 — provision + deploy in anonymous mode
@@ -715,7 +705,7 @@ azd up
 ```
 
 Once `azd up` finishes, grab the FQDN and register it with the blueprint
-(the blueprint itself must already exist — see Step 4):
+(the blueprint itself must already exist — see Step 3):
 
 ```bash
 FQDN=$(azd env get-values | grep AGENT_FQDN | cut -d= -f2 | tr -d '"')
@@ -792,7 +782,7 @@ a365 setup blueprint --agent-name <your-agent-base-name> --endpoint-only \
 Use `--update-endpoint` instead of `--endpoint-only` whenever the tunnel URL
 rotates.
 
-### Step 6 — Post-deploy actions (browser only)
+### Step 5 — Post-deploy actions (browser only)
 
 These are manual and must be done by you in a browser.
 

@@ -40,3 +40,7 @@ Agent365-devTools/
 # Agent 365 generated state / secrets
 a365.generated.config.json
 a365.generated.config.*.json
+
+# Agent 365 environment config (per-developer identity)
+a365.config.json
+a365.config.*.json

@@ -1,7 +1,10 @@
 # Simulate a group discussion
-- Add the users to the group - e.g. johandy@, aaron@, sithu@
+Add the users to the group - e.g. johandy@, aaron@, sithu@
 
 ## 1. Seed Conversation data
+
+Copy the seed conversation data into the Teams chat as background information for the agent
+
 ```
 Aaron Yue — Mon 8 Jun, 9:14 AM Morning all! HOD gave the green light for our annual team building 🎉 She said keep it around S$3k for now, nothing fancy. We've got the floor to pick something.
 Johandy Tantra — Mon 8 Jun, 9:21 AM Nice. Headcount is 40 including the two new hires. Can we please NOT do another sports day 😅 my knees still haven't recovered from last year.
@@ -45,7 +48,8 @@ This demo tenant is restricted to sending emails outside so for this demo we can
 > {agent_name} ok help me draft the email to request for quotation. Send it to {your_user@M365CPI15651853.onmicrosoft.com}
 
 ## 6. Reply email with a fake quotation
-Right now you should have received an email from the agent - login to outlook and reply below and check that the subject has something like `Quotation Request for ...` as the subject and not just a `Draft`
+
+Right now you should have received an email from the agent - login to outlook and reply below and check that the subject has something like `Quotation Request for ...` as the subject and not just a `Draft`. Copy the fake quotation into an email reply.
 
 ```
 Dear CPF Board Team,

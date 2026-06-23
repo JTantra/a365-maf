@@ -50,7 +50,7 @@ param minReplicas int = 1
 
 @description('Max replicas for autoscale.')
 @minValue(1)
-param maxReplicas int = 3
+param maxReplicas int = 1
 
 // ----- Optional Agent 365 blueprint auth -----------------------------------
 // Leave empty on the first `azd up` (the Container App will boot in anonymous

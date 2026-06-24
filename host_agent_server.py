@@ -40,10 +40,16 @@ from microsoft_agents_a365.notifications.agent_notification import (
 from microsoft_agents_a365.notifications import EmailResponse
 
 from microsoft.opentelemetry import use_microsoft_opentelemetry
-from microsoft_agents_a365.observability.core.middleware.baggage_builder import (
+from microsoft.opentelemetry.a365.core import (
+    AgentDetails,
     BaggageBuilder,
+    Channel,
+    InvokeAgentScope,
+    InvokeAgentScopeDetails,
+    Request,
 )
-from microsoft_agents_a365.runtime.environment_utils import (
+from microsoft.opentelemetry.a365.hosting import BaggageMiddleware
+from microsoft.opentelemetry.a365.runtime import (
     get_observability_authentication_scope,
 )
 from token_cache import cache_agentic_token, get_cached_agentic_token
@@ -53,8 +59,16 @@ ms_agents_logger = logging.getLogger("microsoft_agents")
 ms_agents_logger.addHandler(logging.StreamHandler())
 ms_agents_logger.setLevel(logging.INFO)
 
-observability_logger = logging.getLogger("microsoft_agents_a365.observability")
-observability_logger.setLevel(logging.ERROR)
+# TEMP DIAGNOSTIC: raised to DEBUG (new distro logger namespace) so span
+# export attempts, OTLP POST responses and partialSuccess/drop details surface
+# in container logs. Revert to ERROR once telemetry is confirmed flowing.
+observability_logger = logging.getLogger("microsoft.opentelemetry")
+observability_logger.setLevel(logging.DEBUG)
+
+# TEMP DIAGNOSTIC: surface the raw OTLP exporter HTTP result (200 partialSuccess
+# vs 403) and the token-cache hit/miss that feeds the A365 exporter auth.
+logging.getLogger("opentelemetry.exporter").setLevel(logging.DEBUG)
+logging.getLogger("token_cache").setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 
@@ -76,13 +90,29 @@ def create_and_run_host(
     # Replaces the legacy configure() call with a single entrypoint that sets up
     # tracing, metrics, and logging pipelines including A365 telemetry export.
     # See: https://github.com/microsoft/opentelemetry-distro-python
+
+    # TEMP DIAGNOSTIC: wrap the token resolver to log exactly which
+    # (agent_id, tenant_id) the distro requests at export time, and whether a
+    # cached token was found. A miss here means the A365 OTLP POST goes out with
+    # no auth and is silently dropped — the prime suspect for "spans emit but
+    # nothing lands in CloudAppEvents". Remove once root cause is confirmed.
+    def _diag_token_resolver(agent_id, tenant_id):
+        token = get_cached_agentic_token(tenant_id, agent_id) or ""
+        logger.info(
+            "🔎 A365 export token resolver called: agent_id=%s tenant_id=%s "
+            "token_found=%s",
+            agent_id,
+            tenant_id,
+            bool(token),
+        )
+        return token
+
     use_microsoft_opentelemetry(
         enable_a365=True,
         enable_azure_monitor=False,
-        a365_token_resolver=lambda agent_id, tenant_id: get_cached_agentic_token(
-            tenant_id, agent_id
-        )
-        or "",
+        # TEMP DIAGNOSTIC: print spans to stdout to confirm generation/export.
+        enable_console=True,
+        a365_token_resolver=_diag_token_resolver,
     )
 
     host = GenericAgentHost(agent_class, *agent_args, **agent_kwargs)
@@ -117,6 +147,12 @@ class GenericAgentHost:
         self.storage = MemoryStorage()
         self.connection_manager = MsalConnectionManager(**agents_sdk_config)
         self.adapter = CloudAdapter(connection_manager=self.connection_manager)
+        # Attach A365 baggage to every inbound turn (caller, channel,
+        # conversation, tenant, agent) so all spans are correlated. Replaces
+        # the need for manual BaggageBuilder blocks on standard turns; manual
+        # baggage is still applied on async notification replies that the
+        # middleware does not see.
+        self.adapter.use(BaggageMiddleware())
         self.authorization = Authorization(
             self.storage, self.connection_manager, **agents_sdk_config
         )
@@ -424,9 +460,38 @@ class GenericAgentHost:
 
                     typing_task = asyncio.create_task(_typing_loop())
                     try:
-                        response = await self.agent_instance.process_user_message(
-                            user_message, self.agent_app.auth, self.auth_handler_name, context
-                        )
+                        # A365 observability: open the invoke_agent ROOT span for
+                        # this turn. The Agent Framework emits chat/execute_tool
+                        # CHILD spans during process_user_message; without an
+                        # invoke_agent root, the A365 activity views (Defender,
+                        # M365 admin "agent activity", Purview) stay empty even
+                        # though the child spans ingest into CloudAppEvents.
+                        recipient = context.activity.recipient
+                        conversation = getattr(context.activity, "conversation", None)
+                        conversation_id = getattr(conversation, "id", None)
+                        with InvokeAgentScope.start(
+                            request=Request(
+                                content=user_message,
+                                session_id=conversation_id,
+                                conversation_id=conversation_id,
+                                channel=Channel(name="teams"),
+                            ),
+                            scope_details=InvokeAgentScopeDetails(),
+                            agent_details=AgentDetails(
+                                agent_id=agent_id,
+                                agent_name=getattr(recipient, "name", None),
+                                tenant_id=tenant_id,
+                            ),
+                        ) as agent_scope:
+                            response = await self.agent_instance.process_user_message(
+                                user_message, self.agent_app.auth, self.auth_handler_name, context
+                            )
+                            try:
+                                agent_scope.record_response(
+                                    response if isinstance(response, str) else str(response)
+                                )
+                            except Exception:
+                                pass  # Telemetry recording must never break the turn.
                         await context.send_activity(response)
                     finally:
                         typing_task.cancel()

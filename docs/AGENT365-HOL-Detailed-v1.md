@@ -223,25 +223,6 @@ Before running any commands, take 2 minutes to understand which files you will t
 | `infra/main.bicep` | Azure infrastructure definition | ❌ Leave unchanged |
 | `.azure/<env>/.env` | Local azd environment state | ❌ Auto-managed by azd |
 
-### ⚠️ Verify secrets are excluded from git
-
-Two files will be auto-generated later that contain secrets. Confirm they are in `.gitignore` now, before you proceed:
-
-```bash
-cat .gitignore | grep -E "generated|\.env"
-```
-
-You should see:
-```
-a365.generated.config.json
-a365.generated.config.*.json
-.env
-.azure/
-```
-
-> ⚠️ If you accidentally stage `a365.generated.config.json` at any point: `git reset HEAD a365.generated.config.json`
-> ⚠️ Never commit this file — it contains the agent's client secret.
-
 ---
 
 ## Step 2 — Set Lab Variables

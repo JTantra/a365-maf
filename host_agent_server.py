@@ -109,7 +109,12 @@ def create_and_run_host(
 
     use_microsoft_opentelemetry(
         enable_a365=True,
-        enable_azure_monitor=False,
+        # Enable Azure Monitor export only when an App Insights connection string
+        # is present (injected by infra/resources.bicep). This keeps the agent
+        # working on stacks that don't yet have App Insights provisioned, while
+        # automatically lighting up the second pipeline once it does. The distro
+        # auto-reads APPLICATIONINSIGHTS_CONNECTION_STRING from the environment.
+        enable_azure_monitor=bool(environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING")),
         # TEMP DIAGNOSTIC: print spans to stdout to confirm generation/export.
         enable_console=True,
         a365_token_resolver=_diag_token_resolver,

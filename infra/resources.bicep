@@ -104,6 +104,23 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   }
 }
 
+// ----- Application Insights ------------------------------------------------
+// Workspace-based App Insights component. The microsoft-opentelemetry distro
+// exports a SECOND copy of traces/metrics/logs here (in addition to the A365
+// observability backend) when enable_azure_monitor=True in host_agent_server.py
+// and the APPLICATIONINSIGHTS_CONNECTION_STRING env var below is present.
+// A365 export and Azure Monitor export are independent pipelines.
+resource appInsights 'Microsoft.Insights/components@2020-02-02' = {
+  name: 'appi-${envToken}-${resourceToken}'
+  location: location
+  tags: tags
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logAnalytics.id
+  }
+}
+
 resource containerAppsEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
   name: 'cae-${envToken}-${resourceToken}'
   location: location
@@ -189,6 +206,11 @@ var baseEnv = [
   // the microsoft-opentelemetry distro generates spans locally but does not
   // export them, so the A365 dashboard for this agent will be empty.
   { name: 'ENABLE_A365_OBSERVABILITY_EXPORTER', value: 'true' }
+  // Application Insights connection string. The microsoft-opentelemetry distro
+  // auto-detects this env var when enable_azure_monitor=True and ships a second
+  // copy of telemetry to App Insights for ops/dev dashboards (independent of the
+  // A365 observability export above).
+  { name: 'APPLICATIONINSIGHTS_CONNECTION_STRING', value: appInsights.properties.ConnectionString }
   // Max wall-clock time for a single agent turn before it is cancelled and the
   // session is reset. Default in code is 75s; bumped here so longer MCP tool
   // chains (broad mailbox/Teams searches, async file copy + status polling)
@@ -310,3 +332,5 @@ output AGENT_PRINCIPAL_ID string = agentApp.identity.principalId
 output AGENT_AUTH_MODE string = authEnabled ? 'agentic' : 'anonymous'
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = registry.properties.loginServer
 output AZURE_CONTAINER_REGISTRY_NAME string = registry.name
+output APPLICATIONINSIGHTS_CONNECTION_STRING string = appInsights.properties.ConnectionString
+output APPLICATIONINSIGHTS_NAME string = appInsights.name
